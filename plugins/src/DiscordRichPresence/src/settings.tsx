@@ -4,7 +4,7 @@ import { useProxy } from "@vendetta/storage";
 import { storage } from "@vendetta/plugin";
 import { getAssetIDByName } from "@vendetta/ui/assets";
 
-const { FormText, FormInput, FormSection, FormSwitchRow } = Forms;
+const { FormInput, FormSection, FormSwitchRow } = Forms;
 
 const typedStorage = storage as typeof storage & {
     selected: string;
@@ -18,17 +18,23 @@ const Icons = {
 export default function Settings() {
     useProxy(typedStorage);
 
-    // Safe fallback
-    const activity = typedStorage.selections[typedStorage.selected] ?? {
-        name: "",
-        application_id: "",
-        type: 0,
-        details: "",
-        state: "",
-        timestamps: { _enabled: false, start: Date.now() },
-        assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
-        buttons: [{ label: "", url: "" }, { label: "", url: "" }]
-    };
+    // Bezpieczny fallback
+    if (!typedStorage.selected) typedStorage.selected = "default";
+    if (!typedStorage.selections) typedStorage.selections = {};
+    if (!typedStorage.selections[typedStorage.selected]) {
+        typedStorage.selections[typedStorage.selected] = {
+            name: "",
+            application_id: "",
+            type: 0,
+            details: "",
+            state: "",
+            timestamps: { _enabled: false, start: Date.now() },
+            assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
+            buttons: [{ label: "", url: "" }, { label: "", url: "" }]
+        };
+    }
+
+    const activity = typedStorage.selections[typedStorage.selected];
 
     return (
         <ErrorBoundary>
@@ -94,7 +100,7 @@ export default function Settings() {
 
                 <FormSection title="Buttons" titleStyleType="no_border">
                     {activity.buttons.map((b, i) => (
-                        <RN.View key={i}>
+                        <RN.View key={i} style={{ marginBottom: 8 }}>
                             <FormInput
                                 title={`Button ${i + 1} Label`}
                                 placeholder="Label"

@@ -1,42 +1,28 @@
-import { EventEmitter } from "events";
-import net from "net";
+import { MiniEmitter } from "./ws";
 
-function getIPCPath(id: number) {
-    if (process.platform === "win32") return `\\\\?\\pipe\\discord-ipc-${id}`;
-    return `/tmp/discord-ipc-${id}`;
+export interface Activity {
+    name: string;
+    application_id: string;
+    type: number;
+    details: string;
+    state: string;
+    timestamps: { _enabled: boolean; start: number };
+    assets: { large_image: string; large_text: string; small_image: string; small_text: string };
+    buttons: { label: string; url: string }[];
 }
 
-async function getIPC(id = 0): Promise<net.Socket> {
-    return new Promise((resolve, reject) => {
-        const sock = net.createConnection(getIPCPath(id), () => resolve(sock));
-        sock.once("error", () => {
-            if (id < 10) resolve(getIPC(id + 1));
-            else reject(new Error("Could not connect"));
-        });
-    });
-}
-
-export default class IPCTransport extends EventEmitter {
-    socket: net.Socket | null = null;
-
-    constructor(public clientId: string) {
+export default class RPCClient extends MiniEmitter {
+    clientId: string;
+    constructor(clientId: string) {
         super();
+        this.clientId = clientId;
     }
 
-    async connect() {
-        this.socket = await getIPC();
-        this.socket.on("close", (e) => this.emit("close", e));
+    connect() {
         this.emit("open");
     }
 
-    send(data: any) {
-        if (!this.socket) return;
-        const str = JSON.stringify(data);
-        const len = Buffer.byteLength(str);
-        const packet = Buffer.alloc(8 + len);
-        packet.writeInt32LE(1, 0); // OPCODE FRAME
-        packet.writeInt32LE(len, 4);
-        packet.write(str, 8);
-        this.socket.write(packet);
+    sendActivity(activity: Activity) {
+        this.emit("activity", activity);
     }
 }

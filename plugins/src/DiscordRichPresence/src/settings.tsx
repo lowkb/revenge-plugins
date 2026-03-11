@@ -1,40 +1,145 @@
-import { React, ReactNative } from "@vendetta/metro/common";
-import { storage } from "@vendetta/plugin";
-import { useProxy } from "@vendetta/storage";
-import { getAssetIDByName } from "@vendetta/ui/assets";
-import { ErrorBoundary, Forms } from "@vendetta/ui/components";
+import { ErrorBoundary } from "@vendetta/ui/components";
+import { Forms } from "@vendetta/ui/components";
+import { ReactNative as RN } from "@vendetta/metro/common";
 
-const { FormInput, FormSection, FormSwitchRow, FormIcon } = Forms;
+const {
+    FormSection,
+    FormInput,
+    FormSwitchRow,
+    FormIcon
+} = Forms;
 
-const Icons = {
-    RPC: getAssetIDByName("GameControllerIcon")
-};
+import { Icons } from "@vendetta/ui/assets";
 
-const typedStorage = storage as typeof storage & {
-    selected: string;
-    selections: Record<string, Activity>;
-};
+export interface Activity {
+    name: string;
+    application_id: string;
+    type: number;
+    details: string;
+    state: string;
+    timestamps: {
+        _enabled: boolean;
+        start?: number;
+    };
+    assets: {
+        large_image: string;
+        large_text: string;
+        small_image: string;
+        small_text: string;
+    };
+    buttons: {
+        label: string;
+        url: string;
+    }[];
+}
 
-export default () => {
-    useProxy(typedStorage);
-
-    const activity = typedStorage.selections[typedStorage.selected];
-
+export default function Settings({ activity }: { activity: Activity }) {
     return (
         <ErrorBoundary>
-            <ReactNative.ScrollView style={{ flex: 1 }}>
+            <RN.ScrollView style={{ flex: 1 }}>
 
                 <FormSection title="Basic" titleStyleType="no_border">
 
                     <FormInput
                         title="Name"
-                        placeholder="Example RPC"
-                        leading={<FormIcon source={Icons.RPC} />}
+                        placeholder="name"
                         value={activity.name}
+                        leading={<FormIcon source={Icons.RPC} />}
                         onChange={v => activity.name = v}
                     />
 
                     <FormInput
+                        title="Application ID"
+                        placeholder=""
+                        value={activity.application_id}
+                        onChange={v => activity.application_id = v}
+                    />
+
+                    <FormInput
+                        title="Details"
+                        placeholder="detail"
+                        value={activity.details}
+                        onChange={v => activity.details = v}
+                    />
+
+                    <FormInput
+                        title="State"
+                        placeholder="state"
+                        value={activity.state}
+                        onChange={v => activity.state = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Assets" titleStyleType="no_border">
+
+                    <FormInput
+                        title="Large Image Key"
+                        value={activity.assets.large_image}
+                        onChange={v => activity.assets.large_image = v}
+                    />
+
+                    <FormInput
+                        title="Large Text"
+                        value={activity.assets.large_text}
+                        onChange={v => activity.assets.large_text = v}
+                    />
+
+                    <FormInput
+                        title="Small Image Key"
+                        value={activity.assets.small_image}
+                        onChange={v => activity.assets.small_image = v}
+                    />
+
+                    <FormInput
+                        title="Small Text"
+                        value={activity.assets.small_text}
+                        onChange={v => activity.assets.small_text = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Timestamps" titleStyleType="no_border">
+
+                    <FormSwitchRow
+                        label="Enable timestamps"
+                        value={activity.timestamps._enabled}
+                        onValueChange={v => activity.timestamps._enabled = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Buttons" titleStyleType="no_border">
+
+                    {activity.buttons.map((b, i) => (
+                        <RN.View key={i}>
+
+                            <FormInput
+                                title={`Button ${i + 1} Label`}
+                                placeholder="Label"
+                                value={b.label}
+                                onChange={v => b.label = v}
+                            />
+
+                            <FormInput
+                                title={`Button ${i + 1} URL`}
+                                placeholder="https://example.com"
+                                value={b.url}
+                                onChange={v => b.url = v}
+                            />
+
+                        </RN.View>
+                    ))}
+
+                </FormSection>
+
+            </RN.ScrollView>
+        </ErrorBoundary>
+    );
+}                    <FormInput
                         title="Application ID"
                         placeholder="Discord Application ID"
                         value={activity.application_id}

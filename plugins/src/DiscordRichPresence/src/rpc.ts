@@ -1,17 +1,41 @@
-import { Activity } from "./types";
+// src/rpc.ts (lub osobny WebSocketTransport.ts)
+import type { Activity } from "./types";
 
-export default class RPCClient {
-    clientId: string;
+type EventCallback = (...args: any[]) => void;
 
-    constructor(clientId: string) {
-        this.clientId = clientId;
+export default class WebSocketTransport {
+    ws: WebSocket | null = null;
+    tries = 0;
+    private listeners: Record<string, EventCallback[]> = {};
+
+    constructor(public clientId: string) {}
+
+    on(event: string, cb: EventCallback) {
+        if (!this.listeners[event]) this.listeners[event] = [];
+        this.listeners[event].push(cb);
     }
 
-    connect(): void {
-        console.log("[RPC] Connected");
+    off(event: string, cb: EventCallback) {
+        if (!this.listeners[event]) return;
+        this.listeners[event] = this.listeners[event].filter(fn => fn !== cb);
     }
 
-    sendActivity(activity: Activity): void {
-        console.log("[RPC] Sending activity:", activity);
+    emit(event: string, ...args: any[]) {
+        if (!this.listeners[event]) return;
+        for (const cb of this.listeners[event]) cb(...args);
+    }
+
+    connect() {
+        const port = 6463 + (this.tries % 10);
+        this.tries++;
+        this.ws = new WebSocket(`ws://127.0.0.1:${port}/?v=1&client_id=${this.clientId}`);
+        this.ws.onopen = () => this.emit("open");
+        this.ws.onclose = (e) => this.emit("close", e);
+        this.ws.onerror = () => setTimeout(() => this.connect(), 250);
+        this.ws.onmessage = (msg) => this.emit("message", JSON.parse(msg.data));
+    }
+
+    send(data: any) {
+        this.ws?.send(JSON.stringify(data));
     }
 }

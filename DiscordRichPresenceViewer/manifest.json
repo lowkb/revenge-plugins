@@ -1,1 +1,0 @@
-{"name":"DiscordRichPresenceViewer","description":"Wyświetla Rich Presence użytkownika i automatycznie wysyła RPC.","version":"1.0.0","author":"low_kb","main":"index.js","vendetta":{"id":"discord-rich-presence-viewer","ui":false},"hash":"62014477bb849ec98989590b75185e9d10d37c5ebcf5e3de2d6222600e28ad94"}

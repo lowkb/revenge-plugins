@@ -20,21 +20,112 @@ export default () => {
 
     const activity = typedStorage.selections[typedStorage.selected];
 
-    if (!activity) {
-        typedStorage.selected = "default";
-        typedStorage.selections.default = {
-            name: "",
-            application_id: "",
-            type: 0,
-            details: "",
-            state: "",
-            timestamps: { _enabled: false, start: Date.now() },
-            assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
-            buttons: [{ label: "", url: "" }, { label: "", url: "" }]
-        };
-    }
-
     return (
+        <ErrorBoundary>
+            <ReactNative.ScrollView style={{ flex: 1 }}>
+
+                <FormSection title="Basic" titleStyleType="no_border">
+
+                    <FormInput
+                        title="Name"
+                        placeholder="Example RPC"
+                        leading={<FormIcon source={Icons.RPC} />}
+                        value={activity.name}
+                        onChange={v => activity.name = v}
+                    />
+
+                    <FormInput
+                        title="Application ID"
+                        placeholder="Discord Application ID"
+                        value={activity.application_id}
+                        onChange={v => activity.application_id = v}
+                    />
+
+                    <FormInput
+                        title="Details"
+                        placeholder="Example details"
+                        value={activity.details}
+                        onChange={v => activity.details = v}
+                    />
+
+                    <FormInput
+                        title="State"
+                        placeholder="Example state"
+                        value={activity.state}
+                        onChange={v => activity.state = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Assets" titleStyleType="no_border">
+
+                    <FormInput
+                        title="Large Image Key"
+                        value={activity.assets.large_image}
+                        onChange={v => activity.assets.large_image = v}
+                    />
+
+                    <FormInput
+                        title="Large Text"
+                        value={activity.assets.large_text}
+                        onChange={v => activity.assets.large_text = v}
+                    />
+
+                    <FormInput
+                        title="Small Image Key"
+                        value={activity.assets.small_image}
+                        onChange={v => activity.assets.small_image = v}
+                    />
+
+                    <FormInput
+                        title="Small Text"
+                        value={activity.assets.small_text}
+                        onChange={v => activity.assets.small_text = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Timestamps" titleStyleType="no_border">
+
+                    <FormSwitchRow
+                        label="Enable timestamps"
+                        value={activity.timestamps._enabled}
+                        onValueChange={v => activity.timestamps._enabled = v}
+                    />
+
+                </FormSection>
+
+
+                <FormSection title="Buttons" titleStyleType="no_border">
+
+                    {activity.buttons.map((b, i) => (
+                        <React.Fragment key={i}>
+
+                            <FormInput
+                                title={`Button ${i + 1} Label`}
+                                placeholder="Label"
+                                value={b.label}
+                                onChange={v => b.label = v}
+                            />
+
+                            <FormInput
+                                title={`Button ${i + 1} URL`}
+                                placeholder="https://example.com"
+                                value={b.url}
+                                onChange={v => b.url = v}
+                            />
+
+                        </React.Fragment>
+                    ))}
+
+                </FormSection>
+
+            </ReactNative.ScrollView>
+        </ErrorBoundary>
+    );
+};    return (
         <ErrorBoundary>
             <ReactNative.ScrollView style={{ flex: 1 }}>
 

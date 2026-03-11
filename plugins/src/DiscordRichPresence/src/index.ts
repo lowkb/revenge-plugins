@@ -37,26 +37,19 @@ function createDefaultSelection(): Activity {
     };
 }
 
-
-if (!typedStorage.selected || !typedStorage.selections) {
-    typedStorage.selected = "default";
-    typedStorage.selections = { default: createDefaultSelection() };
-} else if (!typedStorage.selections[typedStorage.selected]) {
-    typedStorage.selections[typedStorage.selected] = createDefaultSelection();
+function ensureStorage() {
+    if (!typedStorage.selected || !typedStorage.selections) {
+        typedStorage.selected = "default";
+        typedStorage.selections = { default: createDefaultSelection() };
+    } else if (!typedStorage.selections[typedStorage.selected]) {
+        typedStorage.selections[typedStorage.selected] = createDefaultSelection();
+    }
 }
 
-async function sendActivity(activity: Activity | null) {
-    if (!activity) {
-        FluxDispatcher.dispatch({
-            type: "LOCAL_ACTIVITY_UPDATE",
-            activity: null,
-            pid: 1608,
-            socketId: "RPC@Vendetta"
-        });
-        return;
-    }
+async function sendActivity(activity?: Activity | null) {
+    const act = activity ?? createDefaultSelection();
 
-    const cleanActivity = { ...activity };
+    const cleanActivity = { ...act };
     cleanActivity.buttons = cleanActivity.buttons.filter(b => b.label && b.url);
     if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
 
@@ -72,8 +65,11 @@ async function sendActivity(activity: Activity | null) {
 
 const plugin = {
     onLoad() {
-        const current = typedStorage.selections[typedStorage.selected];
-        sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
+        ensureStorage()
+        setTimeout(() => {
+            const current = typedStorage.selections[typedStorage.selected];
+            sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
+        }, 50);
     },
     onUnload() {
         sendActivity(null);

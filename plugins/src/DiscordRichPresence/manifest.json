@@ -1,11 +1,14 @@
 {
-    "name": "Discord Rich Presence",
-    "description": "fully configuraly rpc with buttons",
-    "authors": [
-        {
-            "name": "enummaster",
-            "id": "1474889588131762206"
-        }
-    ],
-    "main": "src/index.ts"
+  "name": "Discord Rich Presence",
+  "description": "fully configurable Discord Rich Presence with buttons",
+  "authors": [
+    {
+      "name": "enummaster",
+      "id": "1474889588131762206"
+    }
+  ],
+  "main": "src/index.ts",
+  "vendetta": {
+    "icon": "GameControllerIcon"
+  }
 }

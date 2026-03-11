@@ -1,78 +1,45 @@
-import { FluxDispatcher } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
 import { logger } from "@vendetta";
 import Settings from "./settings";
-
-export type Activity = {
-    name: string;
-    application_id: string;
-    type: number;
-    details: string;
-    state: string;
-    timestamps: { _enabled: boolean; start: number };
-    assets: { large_image: string; large_text: string; small_image: string; small_text: string };
-    buttons: { label: string; url: string }[];
-};
+import RPCClient, { Activity } from "./rpc";
 
 const typedStorage = storage as typeof storage & {
     selected: string;
     selections: Record<string, Activity>;
 };
 
-const pluginStart = Date.now();
-
-function createDefaultSelection(): Activity {
-    return {
-        name: "",
-        application_id: "",
-        type: 0,
-        details: "",
-        state: "",
-        timestamps: { _enabled: false, start: pluginStart },
-        assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
-        buttons: [
-            { label: "", url: "" },
-            { label: "", url: "" }
-        ]
-    };
-}
+let rpc: RPCClient;
 
 function ensureStorage() {
-    if (!typedStorage.selected || !typedStorage.selections) {
-        typedStorage.selected = "default";
-        typedStorage.selections = { default: createDefaultSelection() };
-    } else if (!typedStorage.selections[typedStorage.selected]) {
-        typedStorage.selections[typedStorage.selected] = createDefaultSelection();
+    if (!typedStorage.selected) typedStorage.selected = "default";
+    if (!typedStorage.selections) typedStorage.selections = {};
+    if (!typedStorage.selections[typedStorage.selected]) {
+        typedStorage.selections[typedStorage.selected] = {
+            name: "Vendetta RPC",
+            application_id: "",
+            type: 0,
+            details: "",
+            state: "",
+            timestamps: { start: Date.now() },
+            assets: {},
+            buttons: [],
+        };
     }
 }
 
-async function sendActivity(activity?: Activity | null) {
-    const act = activity ?? createDefaultSelection();
-
-    const cleanActivity = { ...act };
-    cleanActivity.buttons = cleanActivity.buttons.filter(b => b.label && b.url);
-    if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
-
-    FluxDispatcher.dispatch({
-        type: "ACTIVITY_UPDATE",
-        activity: cleanActivity,
-        pid: 1608,
-        socketId: "RPC@Vendetta"
-    });
-
-    logger.log("[RPC] Activity sent:", cleanActivity);
+function sendActivity(activity?: Activity) {
+    if (!rpc) return;
+    rpc.sendActivity(activity ?? typedStorage.selections[typedStorage.selected]);
 }
 
 const plugin = {
     onLoad() {
-        ensureStorage()
-        setTimeout(() => {
-            const current = typedStorage.selections[typedStorage.selected];
-            sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
-        }, 50);
+        ensureStorage();
+        rpc = new RPCClient("YOUR_CLIENT_ID"); // <- ustaw swój Discord App Client ID
+        setTimeout(() => sendActivity(), 50);
     },
     onUnload() {
-        sendActivity(null);
+        sendActivity({ name: "", application_id: "", type: 0, details: "", state: "" });
     },
     settings: Settings
 };

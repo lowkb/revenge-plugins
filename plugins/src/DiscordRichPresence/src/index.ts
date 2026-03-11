@@ -1,3 +1,4 @@
+import { FluxDispatcher } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
 import { logger } from "@vendetta";
 import Settings from "./settings";
@@ -8,41 +9,59 @@ const typedStorage = storage as typeof storage & {
     selections: Record<string, Activity>;
 };
 
-let rpc: RPCClient;
+const pluginStart = Date.now();
+
+function createDefaultSelection(): Activity {
+    return {
+        name: "",
+        application_id: "",
+        type: 0,
+        details: "",
+        state: "",
+        timestamps: { _enabled: false, start: pluginStart },
+        assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
+        buttons: [{ label: "", url: "" }, { label: "", url: "" }]
+    };
+}
 
 function ensureStorage() {
-    if (!typedStorage.selected) typedStorage.selected = "default";
-    if (!typedStorage.selections) typedStorage.selections = {};
-    if (!typedStorage.selections[typedStorage.selected]) {
-        typedStorage.selections[typedStorage.selected] = {
-            name: "Vendetta RPC",
-            application_id: "",
-            type: 0,
-            details: "",
-            state: "",
-            timestamps: { start: Date.now() },
-            assets: {},
-            buttons: [],
-        };
+    if (!typedStorage.selected || !typedStorage.selections) {
+        typedStorage.selected = "default";
+        typedStorage.selections = { default: createDefaultSelection() };
+    } else if (!typedStorage.selections[typedStorage.selected]) {
+        typedStorage.selections[typedStorage.selected] = createDefaultSelection();
     }
 }
 
-function sendActivity(activity?: Activity) {
-    if (!rpc) return;
-    rpc.sendActivity(activity ?? typedStorage.selections[typedStorage.selected]);
+async function sendActivity(activity?: Activity | null) {
+    const act = activity ?? createDefaultSelection();
+    const cleanActivity = { ...act };
+    cleanActivity.buttons = cleanActivity.buttons.filter(b => b.label && b.url);
+    if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
+
+    FluxDispatcher.dispatch({
+        type: "ACTIVITY_UPDATE",
+        activity: cleanActivity,
+        pid: 1608,
+        socketId: "RPC@Vendetta"
+    });
+
+    logger.log("[RPC] Activity sent:", cleanActivity);
 }
 
 const plugin = {
     onLoad() {
         ensureStorage();
-        rpc = new RPCClient("YOUR_CLIENT_ID"); // <- ustaw swój Discord App Client ID
-        setTimeout(() => sendActivity(), 50);
+        setTimeout(() => {
+            const current = typedStorage.selections[typedStorage.selected];
+            sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
+        }, 50);
     },
     onUnload() {
-        sendActivity({ name: "", application_id: "", type: 0, details: "", state: "" });
+        sendActivity(null);
     },
     settings: Settings
 };
 
 export default plugin;
-export { sendActivity };
+export { sendActivity, Activity };

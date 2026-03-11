@@ -39,7 +39,7 @@ export default function Settings() {
     return (
         <ErrorBoundary>
             <RN.ScrollView style={{ flex: 1, padding: 16 }}>
-                <FormSection title="Basic" titleStyleType="no_border">
+                <FormSection title="configuration" titleStyleType="no_border">
                     <FormInput
                         title="Name"
                         placeholder="name"

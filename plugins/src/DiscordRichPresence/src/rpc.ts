@@ -1,4 +1,6 @@
 // src/rpc.ts
+
+// Interfejs Activity wyraźnie eksportowany
 export interface Activity {
     name: string;
     application_id: string;
@@ -10,6 +12,7 @@ export interface Activity {
     buttons: { label: string; url: string }[];
 }
 
+// Klasa RPCClient eksportowana jako default
 export default class RPCClient {
     clientId: string;
 

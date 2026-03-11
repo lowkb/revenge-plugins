@@ -54,7 +54,7 @@ async function sendActivity(activity?: Activity | null) {
     if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
 
     FluxDispatcher.dispatch({
-        type: "LOCAL_ACTIVITY_UPDATE",
+        type: "ACTIVITY_UPDATE",
         activity: cleanActivity,
         pid: 1608,
         socketId: "RPC@Vendetta"

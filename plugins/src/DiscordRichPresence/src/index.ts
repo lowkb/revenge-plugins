@@ -3,6 +3,17 @@ import { storage } from "@vendetta/plugin";
 import { logger } from "@vendetta";
 import Settings from "./settings";
 
+export type Activity = {
+    name: string;
+    application_id: string;
+    type: number;
+    details: string;
+    state: string;
+    timestamps: { _enabled: boolean; start: number };
+    assets: { large_image: string; large_text: string; small_image: string; small_text: string };
+    buttons: { label: string; url: string }[];
+};
+
 const typedStorage = storage as typeof storage & {
     selected: string;
     selections: Record<string, Activity>;
@@ -12,29 +23,65 @@ const pluginStart = Date.now();
 
 function createDefaultSelection(): Activity {
     return {
-        name: "Example RPC",
+        name: "",
         application_id: "",
         type: 0,
-        details: "Example details",
-        state: "Example state",
-        timestamps: {
-            _enabled: true,
-            start: pluginStart
-        },
-        assets: {
-            large_image: "",
-            large_text: "Large image text",
-            small_image: "",
-            small_text: "Small image text"
-        },
+        details: "",
+        state: "",
+        timestamps: { _enabled: false, start: pluginStart },
+        assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
         buttons: [
-            { label: "GitHub", url: "https://github.com" },
-            { label: "Website", url: "https://example.com" }
+            { label: "", url: "" },
+            { label: "", url: "" }
         ]
     };
 }
 
-if (!typedStorage.selected) typedStorage.selected = "default";
+// Ensure storage is initialized
+if (!typedStorage.selected || !typedStorage.selections) {
+    typedStorage.selected = "default";
+    typedStorage.selections = { default: createDefaultSelection() };
+} else if (!typedStorage.selections[typedStorage.selected]) {
+    typedStorage.selections[typedStorage.selected] = createDefaultSelection();
+}
+
+async function sendActivity(activity: Activity | null) {
+    if (!activity) {
+        FluxDispatcher.dispatch({
+            type: "LOCAL_ACTIVITY_UPDATE",
+            activity: null,
+            pid: 1608,
+            socketId: "RPC@Vendetta"
+        });
+        return;
+    }
+
+    const cleanActivity = { ...activity };
+
+    // Remove empty buttons
+    cleanActivity.buttons = cleanActivity.buttons.filter(b => b.label && b.url);
+    if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
+
+    FluxDispatcher.dispatch({
+        type: "LOCAL_ACTIVITY_UPDATE",
+        activity: cleanActivity,
+        pid: 1608,
+        socketId: "RPC@Vendetta"
+    });
+
+    logger.log("[RPC] Activity sent:", cleanActivity);
+}
+
+export default {
+    onLoad() {
+        const current = typedStorage.selections[typedStorage.selected];
+        sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
+    },
+    onUnload() {
+        sendActivity(null);
+    },
+    settings: Settings
+};if (!typedStorage.selected) typedStorage.selected = "default";
 if (!typedStorage.selections) typedStorage.selections = {};
 if (!typedStorage.selections.default) typedStorage.selections.default = createDefaultSelection();
 

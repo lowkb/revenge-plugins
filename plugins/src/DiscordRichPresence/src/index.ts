@@ -2,7 +2,8 @@ import { FluxDispatcher } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
 import { logger } from "@vendetta";
 import Settings from "./settings";
-import RPCClient, { Activity } from "./rpc";
+import RPCClient from "./rpc";
+import type { Activity } from "./types";
 
 const typedStorage = storage as typeof storage & {
     selected: string;
@@ -64,4 +65,5 @@ const plugin = {
 };
 
 export default plugin;
-export { sendActivity, Activity };
+export { sendActivity };
+export type { Activity };

@@ -1,4 +1,4 @@
-// src/rpc.ts (lub osobny WebSocketTransport.ts)
+
 import type { Activity } from "./types";
 
 type EventCallback = (...args: any[]) => void;

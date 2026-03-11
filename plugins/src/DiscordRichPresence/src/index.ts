@@ -37,7 +37,7 @@ function createDefaultSelection(): Activity {
     };
 }
 
-// Ensure storage is initialized
+
 if (!typedStorage.selected || !typedStorage.selections) {
     typedStorage.selected = "default";
     typedStorage.selections = { default: createDefaultSelection() };
@@ -57,8 +57,6 @@ async function sendActivity(activity: Activity | null) {
     }
 
     const cleanActivity = { ...activity };
-
-    // Remove empty buttons
     cleanActivity.buttons = cleanActivity.buttons.filter(b => b.label && b.url);
     if (cleanActivity.buttons.length === 0) delete cleanActivity.buttons;
 
@@ -72,7 +70,7 @@ async function sendActivity(activity: Activity | null) {
     logger.log("[RPC] Activity sent:", cleanActivity);
 }
 
-export default {
+const plugin = {
     onLoad() {
         const current = typedStorage.selections[typedStorage.selected];
         sendActivity(current).catch(e => logger.error("[RPC] Failed:", e));
@@ -81,78 +79,7 @@ export default {
         sendActivity(null);
     },
     settings: Settings
-};if (!typedStorage.selected) typedStorage.selected = "default";
-if (!typedStorage.selections) typedStorage.selections = {};
-if (!typedStorage.selections.default) typedStorage.selections.default = createDefaultSelection();
-
-function buildActivity(activity: Activity) {
-    const result: any = {};
-
-    if (activity.name) result.name = activity.name;
-    if (activity.application_id) result.application_id = activity.application_id;
-    if (activity.type !== undefined) result.type = activity.type;
-    if (activity.details) result.details = activity.details;
-    if (activity.state) result.state = activity.state;
-
-    if (activity.timestamps?._enabled) {
-        result.timestamps = {
-            start: activity.timestamps.start
-        };
-    }
-
-    if (activity.assets) {
-        const assets: any = {};
-
-        if (activity.assets.large_image) assets.large_image = activity.assets.large_image;
-        if (activity.assets.large_text) assets.large_text = activity.assets.large_text;
-        if (activity.assets.small_image) assets.small_image = activity.assets.small_image;
-        if (activity.assets.small_text) assets.small_text = activity.assets.small_text;
-
-        if (Object.keys(assets).length) result.assets = assets;
-    }
-
-    const buttons = (activity.buttons || []).filter(b => b?.label && b?.url);
-    if (buttons.length) result.buttons = buttons;
-
-    return result;
-}
-
-function sendActivity(activity: Activity | null) {
-    if (!activity) {
-        FluxDispatcher.dispatch({
-            type: "LOCAL_ACTIVITY_UPDATE",
-            pid: 1608,
-            socketId: "RPC@Vendetta",
-            activity: null
-        });
-        return;
-    }
-
-    const cleanActivity = buildActivity(activity);
-
-    FluxDispatcher.dispatch({
-        type: "LOCAL_ACTIVITY_UPDATE",
-        pid: 1608,
-        socketId: "RPC@Vendetta",
-        activity: cleanActivity
-    });
-
-    logger.log("[RPC] Activity sent", cleanActivity);
-}
-
-export default {
-    onLoad() {
-        try {
-            const current = typedStorage.selections[typedStorage.selected];
-            sendActivity(current);
-        } catch (e) {
-            logger.error("[RPC] Failed to send activity", e);
-        }
-    },
-
-    onUnload() {
-        sendActivity(null);
-    },
-
-    settings: Settings
 };
+
+export default plugin;
+export { sendActivity };

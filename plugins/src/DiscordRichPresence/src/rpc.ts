@@ -12,17 +12,16 @@ export interface Activity {
 
 export default class RPCClient {
     clientId: string;
+
     constructor(clientId: string) {
         this.clientId = clientId;
     }
 
-    connect() {
-        // w minimalnej wersji tylko logika otwarcia
+    connect(): void {
         console.log("[RPC] Connected");
     }
 
-    sendActivity(activity: Activity) {
-        // w minimalnej wersji tylko log aktywności
+    sendActivity(activity: Activity): void {
         console.log("[RPC] Sending activity:", activity);
     }
 }

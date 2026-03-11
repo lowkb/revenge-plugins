@@ -1,27 +1,28 @@
-export type Callback = (...args: any[]) => void;
+// src/rpc.ts
+export interface Activity {
+    name: string;
+    application_id: string;
+    type: number;
+    details: string;
+    state: string;
+    timestamps: { _enabled: boolean; start: number };
+    assets: { large_image: string; large_text: string; small_image: string; small_text: string };
+    buttons: { label: string; url: string }[];
+}
 
-export class MiniEmitter {
-    private listeners: Record<string, Callback[]> = {};
-
-    on(event: string, cb: Callback) {
-        if (!this.listeners[event]) this.listeners[event] = [];
-        this.listeners[event].push(cb);
+export default class RPCClient {
+    clientId: string;
+    constructor(clientId: string) {
+        this.clientId = clientId;
     }
 
-    once(event: string, cb: Callback) {
-        const wrapper = (...args: any[]) => {
-            cb(...args);
-            this.off(event, wrapper);
-        };
-        this.on(event, wrapper);
+    connect() {
+        // w minimalnej wersji tylko logika otwarcia
+        console.log("[RPC] Connected");
     }
 
-    off(event: string, cb: Callback) {
-        if (!this.listeners[event]) return;
-        this.listeners[event] = this.listeners[event].filter(c => c !== cb);
-    }
-
-    emit(event: string, ...args: any[]) {
-        this.listeners[event]?.forEach(c => c(...args));
+    sendActivity(activity: Activity) {
+        // w minimalnej wersji tylko log aktywności
+        console.log("[RPC] Sending activity:", activity);
     }
 }

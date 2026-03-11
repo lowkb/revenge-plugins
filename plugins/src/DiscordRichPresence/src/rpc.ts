@@ -1,28 +1,27 @@
-import { MiniEmitter } from "./ws";
+export type Callback = (...args: any[]) => void;
 
-export interface Activity {
-    name: string;
-    application_id: string;
-    type: number;
-    details: string;
-    state: string;
-    timestamps: { _enabled: boolean; start: number };
-    assets: { large_image: string; large_text: string; small_image: string; small_text: string };
-    buttons: { label: string; url: string }[];
-}
+export class MiniEmitter {
+    private listeners: Record<string, Callback[]> = {};
 
-export default class RPCClient extends MiniEmitter {
-    clientId: string;
-    constructor(clientId: string) {
-        super();
-        this.clientId = clientId;
+    on(event: string, cb: Callback) {
+        if (!this.listeners[event]) this.listeners[event] = [];
+        this.listeners[event].push(cb);
     }
 
-    connect() {
-        this.emit("open");
+    once(event: string, cb: Callback) {
+        const wrapper = (...args: any[]) => {
+            cb(...args);
+            this.off(event, wrapper);
+        };
+        this.on(event, wrapper);
     }
 
-    sendActivity(activity: Activity) {
-        this.emit("activity", activity);
+    off(event: string, cb: Callback) {
+        if (!this.listeners[event]) return;
+        this.listeners[event] = this.listeners[event].filter(c => c !== cb);
+    }
+
+    emit(event: string, ...args: any[]) {
+        this.listeners[event]?.forEach(c => c(...args));
     }
 }

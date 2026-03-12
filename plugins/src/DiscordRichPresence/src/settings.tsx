@@ -1,38 +1,125 @@
-import { React } from "@vendetta/metro/common";
-import { ScrollView } from "react-native";
-import { FormTextRow, FormSection, FormSelectRow } from "@vendetta/ui/components/Forms";
-import { storage } from "@vendetta";
-import { ActivityTypes } from "./types";
+import { React, ReactNative as RN } from "@vendetta/metro/common";
+import { Forms, ErrorBoundary, FormIcon } from "@vendetta/ui/components";
+import { useProxy } from "@vendetta/storage";
+import { storage } from "@vendetta/plugin";
+import { getAssetIDByName } from "@vendetta/ui/assets";
+import type { Activity } from "./types";
+
+const { FormInput, FormSection, FormSwitchRow } = Forms;
+
+const Icons = {
+  RPC: getAssetIDByName("ic_rich_presence")
+};
 
 export default function Settings() {
-  const update = (key: string, value: any) => storage[key] = value;
+  useProxy(storage);
 
-  if (!storage.application_id) storage.application_id = "1481582227333709844";
-  if (!storage.name) storage.name = "Test Name";
-  if (!storage.details) storage.details = "Test Detail";
-  if (!storage.state) storage.state = "Test State";
-  if (!storage.type) storage.type = 0;
-  if (!storage.assets) storage.assets = { large_image: "large", large_text: "test large", small_image: "small", small_text: "test small" };
-  if (!storage.buttons) storage.buttons = ["Button 1", "Button 2"];
-  if (!storage.metadata) storage.metadata = { button_urls: ["https://example.com","https://example.com"] };
+  // Bezpieczny fallback
+  const activity: Activity = {
+    name: storage.name ?? "",
+    application_id: storage.application_id ?? "",
+    type: storage.type ?? 0,
+    details: storage.details ?? "",
+    state: storage.state ?? "",
+    timestamps: storage.timestamps ?? { _enabled: false, start: Date.now() },
+    assets: storage.assets ?? { large_image: "", large_text: "", small_image: "", small_text: "" },
+    buttons: storage.buttons ?? [{ label: "", url: "" }, { label: "", url: "" }],
+    metadata: storage.metadata ?? {}
+  };
+
+  const updateStorage = (key: keyof Activity, value: any) => {
+    storage[key] = value;
+  };
 
   return (
-    <ScrollView>
-      <FormSection title="Discord Rich Presence Settings">
-        <FormTextRow label="Application ID" defaultValue={storage.application_id} onChangeText={v => update("application_id", v)} />
-        <FormTextRow label="Name" defaultValue={storage.name} onChangeText={v => update("name", v)} />
-        <FormTextRow label="Details" defaultValue={storage.details} onChangeText={v => update("details", v)} />
-        <FormTextRow label="State" defaultValue={storage.state} onChangeText={v => update("state", v)} />
-        <FormSelectRow label="Type" options={ActivityTypes} value={storage.type} onValueChange={v => update("type", v)} />
-        <FormTextRow label="Large Image Key" defaultValue={storage.assets.large_image} onChangeText={v => storage.assets = { ...storage.assets, large_image: v }} />
-        <FormTextRow label="Large Image Text" defaultValue={storage.assets.large_text} onChangeText={v => storage.assets = { ...storage.assets, large_text: v }} />
-        <FormTextRow label="Small Image Key" defaultValue={storage.assets.small_image} onChangeText={v => storage.assets = { ...storage.assets, small_image: v }} />
-        <FormTextRow label="Small Image Text" defaultValue={storage.assets.small_text} onChangeText={v => storage.assets = { ...storage.assets, small_text: v }} />
-        <FormTextRow label="Button 1 Label" defaultValue={storage.buttons[0]} onChangeText={v => storage.buttons = [v, storage.buttons[1]]} />
-        <FormTextRow label="Button 1 URL" defaultValue={storage.metadata.button_urls[0]} onChangeText={v => storage.metadata = { button_urls: [v, storage.metadata.button_urls[1]] }} />
-        <FormTextRow label="Button 2 Label" defaultValue={storage.buttons[1]} onChangeText={v => storage.buttons = [storage.buttons[0], v]} />
-        <FormTextRow label="Button 2 URL" defaultValue={storage.metadata.button_urls[1]} onChangeText={v => storage.metadata = { button_urls: [storage.metadata.button_urls[0], v] }} />
-      </FormSection>
-    </ScrollView>
+    <ErrorBoundary>
+      <RN.ScrollView style={{ flex: 1, padding: 16 }}>
+        <FormSection title="Basic" titleStyleType="no_border">
+          <FormInput
+            title="Name"
+            placeholder="name"
+            value={activity.name}
+            leading={<FormIcon source={Icons.RPC} />}
+            onChange={v => updateStorage("name", v)}
+          />
+          <FormInput
+            title="Application ID"
+            placeholder="Discord Application ID"
+            value={activity.application_id}
+            onChange={v => updateStorage("application_id", v)}
+          />
+          <FormInput
+            title="Details"
+            placeholder="detail"
+            value={activity.details}
+            onChange={v => updateStorage("details", v)}
+          />
+          <FormInput
+            title="State"
+            placeholder="state"
+            value={activity.state}
+            onChange={v => updateStorage("state", v)}
+          />
+        </FormSection>
+
+        <FormSection title="Assets" titleStyleType="no_border">
+          <FormInput
+            title="Large Image Key"
+            value={activity.assets.large_image}
+            onChange={v => updateStorage("assets", { ...activity.assets, large_image: v })}
+          />
+          <FormInput
+            title="Large Text"
+            value={activity.assets.large_text}
+            onChange={v => updateStorage("assets", { ...activity.assets, large_text: v })}
+          />
+          <FormInput
+            title="Small Image Key"
+            value={activity.assets.small_image}
+            onChange={v => updateStorage("assets", { ...activity.assets, small_image: v })}
+          />
+          <FormInput
+            title="Small Text"
+            value={activity.assets.small_text}
+            onChange={v => updateStorage("assets", { ...activity.assets, small_text: v })}
+          />
+        </FormSection>
+
+        <FormSection title="Timestamps" titleStyleType="no_border">
+          <FormSwitchRow
+            label="Enable timestamps"
+            value={activity.timestamps._enabled}
+            onValueChange={v => updateStorage("timestamps", { ...activity.timestamps, _enabled: v })}
+          />
+        </FormSection>
+
+        <FormSection title="Buttons" titleStyleType="no_border">
+          {activity.buttons.map((b, i) => (
+            <RN.View key={i}>
+              <FormInput
+                title={`Button ${i + 1} Label`}
+                placeholder="Label"
+                value={b.label}
+                onChange={v => {
+                  const newButtons = [...activity.buttons];
+                  newButtons[i].label = v;
+                  updateStorage("buttons", newButtons);
+                }}
+              />
+              <FormInput
+                title={`Button ${i + 1} URL`}
+                placeholder="https://example.com"
+                value={b.url}
+                onChange={v => {
+                  const newButtons = [...activity.buttons];
+                  newButtons[i].url = v;
+                  updateStorage("buttons", newButtons);
+                }}
+              />
+            </RN.View>
+          ))}
+        </FormSection>
+      </RN.ScrollView>
+    </ErrorBoundary>
   );
-                                             }
+                                 }

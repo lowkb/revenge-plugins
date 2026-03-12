@@ -1,0 +1,1 @@
+(function(e,n){"use strict";let t;var a={onLoad(){t=setInterval(function(){n.FluxDispatcher.dispatch({type:"IDLE",idle:!1})},2e4)},onUnload(){clearInterval(t)}};return e.default=a,Object.defineProperty(e,"__esModule",{value:!0}),e})({},vendetta.metro.common);

@@ -1,15 +1,13 @@
 import { FluxDispatcher } from "@vendetta/metro/common";
 
-const PID = 1608;
-
 export default {
   onLoad() {
     FluxDispatcher.dispatch({
       type: "LOCAL_ACTIVITY_UPDATE",
-      pid: PID,
+      pid: 1608,
       socketId: "rpc",
       activity: {
-        application_id: "1481582227333709844",
+        application_id: "1481683449885495437",
         name: "Test Name",
         details: "Test Detail",
         state: "Test State",
@@ -39,7 +37,7 @@ export default {
   onUnload() {
     FluxDispatcher.dispatch({
       type: "LOCAL_ACTIVITY_UPDATE",
-      pid: PID,
+      pid: 1608,
       socketId: "rpc",
       activity: { name: "", type: 0 }
     });

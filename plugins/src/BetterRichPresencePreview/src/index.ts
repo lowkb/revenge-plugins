@@ -1,27 +1,26 @@
-import { logger } from "@vendetta";
-const bunny = window.bunny.api.react.jsx;
+import { showToast } from "@vendetta/ui/toasts";
+import { before } from '@vendetta/patcher';
+import { findByProps } from "@vendetta/metro";
+import { getAssetIDByName } from '@vendetta/ui/assets';
+
+const LazyActionSheet = findByProps("openLazy", "hideActionSheet");
+
+function SheetOutput(key: string) {
+    console.log(`[ActionSheetFinder] Opened: ${key}`);
+    showToast(`[ActionSheetFinder] Opened: ${key}`, getAssetIDByName("Check"));
+}
+
+// patch dla wszystkich openLazy
+const unpatchOpenLazy = before("openLazy", LazyActionSheet, ([_, key]) => {
+    SheetOutput(key);
+});
 
 export default {
-  onLoad: () => {
-    logger.log("RichPresencePreview loaded");
-
-    bunny.onJsxCreate("*", (component, ret) => {
-      // Zabezpieczenie przed undefined
-      if (!component && !ret) return;
-
-      // Nazwa komponentu (displayName lub nazwa funkcji/klasy)
-      const name = component?.displayName || component?.name || "unknown";
-
-      // Log propsów, jeśli są
-      const props = ret?.props ? JSON.stringify(ret.props) : "{}";
-
-      logger.log(`[JSX CREATE] Component: ${name}`, props);
-
-      return ret; // zawsze zwracaj ret, żeby klient nie crashował
-    });
-  },
-
-  onUnload: () => {
-    logger.log("RichPresencePreview unloaded");
-  },
+    onLoad() {
+        console.log("[ActionSheetFinder] Loaded!");
+    },
+    onUnload() {
+        unpatchOpenLazy?.();
+        console.log("[ActionSheetFinder] Unloaded!");
+    },
 };

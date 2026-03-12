@@ -1,0 +1,14 @@
+{
+  "name": "AlwaysActive",
+  "description": "Keeps your Discord account active 24/7 by preventing idle status",
+  "authors": [
+    {
+      "name": "low_kb",
+      "id": "1474889588131762206"
+    }
+  ],
+  "main": "src/index.ts",
+  "vendetta": {
+    "icon": "ClockIcon"
+  }
+}

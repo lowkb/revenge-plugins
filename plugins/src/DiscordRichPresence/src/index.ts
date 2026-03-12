@@ -14,7 +14,11 @@ export default {
         details: "Test Detail",
         state: "Test State",
         type: 0,
-        timestamps: { start: Date.now() },
+        flags: 0,
+        timestamps: {
+      _enabled: false,
+      start: Date.now(),
+    },
         assets: {
           large_image: "large",
           large_text: "test large",

@@ -1,26 +1,43 @@
-import { storage, logger } from "@vendetta";
-import Settings from "./settings";
-import { sendRPC } from "./rpc";
-import type { Activity } from "./types";
+import { FluxDispatcher } from "@vendetta/metro/common";
+
+const PID = 1608;
 
 export default {
   onLoad() {
-    logger.log("Discord rich presents on");
-    sendRPC({
-      application_id: storage.application_id,
-      name: storage.name,
-      details: storage.details,
-      state: storage.state,
-      type: storage.type,
-      timestamps: { start: Date.now() },
-      assets: storage.assets,
-      buttons: storage.buttons,
-      metadata: storage.metadata
+    FluxDispatcher.dispatch({
+      type: "LOCAL_ACTIVITY_UPDATE",
+      pid: PID,
+      socketId: "rpc",
+      activity: {
+        application_id: "1481582227333709844",
+        name: "Test Name",
+        details: "Test Detail",
+        state: "Test State",
+        type: 0,
+        timestamps: { start: Date.now() },
+        assets: {
+          large_image: "large",
+          large_text: "test large",
+          small_image: "small",
+          small_text: "test small"
+        },
+        buttons: ["button one", "button two"],
+        metadata: {
+          button_urls: [
+            "https://example.com",
+            "https://example.com"
+          ]
+        }
+      }
     });
   },
+
   onUnload() {
-        logger.log("Discord rich presents off");
-    sendRPC({ application_id: "", name: "" });
-  },
-  settings: Settings
+    FluxDispatcher.dispatch({
+      type: "LOCAL_ACTIVITY_UPDATE",
+      pid: PID,
+      socketId: "rpc",
+      activity: { name: "", type: 0 }
+    });
+  }
 };

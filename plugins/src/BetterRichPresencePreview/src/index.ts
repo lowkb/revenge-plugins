@@ -1,59 +1,28 @@
-import { patcher } from "@vendetta";
-import { findByDisplayNameAll } from "@vendetta/metro";
-import { React, logger } from "@vendetta";
-
-let unpatches: (() => void)[] = [];
+import { logger } from "@vendetta";
+const bunny = window.bunny.api.react.jsx;
 
 export default {
   onLoad: () => {
-    const allViews = findByDisplayNameAll("View");
+    logger.log("RichPresencePreview loaded");
 
-    allViews.forEach(v => {
-      if (!v?.prototype) return;
-      // patchujemy metodę default/render
-      const u = patcher.before("render", v.prototype, (args) => {
-        try {
-          const wrapper = args[0];
-          if (!wrapper?.children) return;
+    // Patch wszystkich JSX-ów
+    bunny.onJsxCreate("*", (component, ret) => {
+      if (!ret || !ret.props) return ret;
 
-          // szukanie children z activity
-          const activity = wrapper.children.find(c => c?.props?.activity || c?.props?.presence);
-          if (!activity) return;
-
-          // dodanie custom buttonów pod Rich Presence
-          if (!activity.props.children) activity.props.children = [];
-          activity.props.children.push(
-            React.createElement(
-              "button",
-              {
-                onClick: () => logger.log("Custom button clicked w Rich Presence!"),
-                style: {
-                  marginTop: 5,
-                  padding: "2px 6px",
-                  borderRadius: 4,
-                  cursor: "pointer",
-                  backgroundColor: "#5865F2",
-                  color: "#FFFFFF",
-                  border: "none",
-                },
-              },
-              "Custom Button"
-            )
-          );
-        } catch (e) {
-          logger.error("BetterRichPresencePreview error", e);
-        }
-      });
-
-      unpatches.push(u);
+      // jeśli komponent ma właściwość 'activities', logujemy ją
+      if (ret.props.activities) {
+        logger.log(
+          `Found Rich Presence in component ${component.displayName || "unknown"}`,
+          ret.props.activities
+        );
+        // dla wygody możemy trzymać w globalu
+        window.lastRichPresence = ret.props.activities;
+      }
+      return ret;
     });
-
-    logger.log("BetterRichPresencePreview: patch applied");
   },
 
   onUnload: () => {
-    unpatches.forEach(u => u());
-    unpatches = [];
-    logger.log("BetterRichPresencePreview unloaded");
+    logger.log("RichPresencePreview unloaded");
   },
 };

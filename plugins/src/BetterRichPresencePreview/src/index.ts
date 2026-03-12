@@ -1,54 +1,59 @@
-import { before } from "@vendetta/patcher";
-import { findByDisplayName } from "@vendetta/metro";
+import { patcher } from "@vendetta";
+import { findByDisplayNameAll } from "@vendetta/metro";
 import { React, logger } from "@vendetta";
 
+let unpatches: (() => void)[] = [];
+
 export default {
-  patch: null as any,
+  onLoad: () => {
+    const allViews = findByDisplayNameAll("View");
 
-  onLoad() {
-    logger.log("BetterRichPresencePreview loaded");
+    allViews.forEach(v => {
+      if (!v?.prototype) return;
+      // patchujemy metodę default/render
+      const u = patcher.before("render", v.prototype, (args) => {
+        try {
+          const wrapper = args[0];
+          if (!wrapper?.children) return;
 
-    const ProfileUserActivity = findByDisplayName("ProfileUserActivity");
-    if (!ProfileUserActivity) {
-      logger.error("Nie znaleziono komponentu Rich Presence w profilu");
-      return;
-    }
+          // szukanie children z activity
+          const activity = wrapper.children.find(c => c?.props?.activity || c?.props?.presence);
+          if (!activity) return;
 
-    this.patch = before("default", ProfileUserActivity.prototype, (args, res) => {
-      try {
-        if (!res?.props) return;
-
-        const presence = res.props.activity || res.props.presence;
-        if (!presence || typeof presence.status !== "string") return;
-
-        // Dodanie custom button pod Rich Presence
-        if (!res.props.children) res.props.children = [];
-        res.props.children.push(
-          React.createElement(
-            "button",
-            {
-              onClick: () => logger.log("Custom Rich Presence button clicked!"),
-              style: {
-                marginTop: 5,
-                padding: "2px 6px",
-                borderRadius: 4,
-                cursor: "pointer",
-                backgroundColor: "#5865F2",
-                color: "#FFFFFF",
-                border: "none",
+          // dodanie custom buttonów pod Rich Presence
+          if (!activity.props.children) activity.props.children = [];
+          activity.props.children.push(
+            React.createElement(
+              "button",
+              {
+                onClick: () => logger.log("Custom button clicked w Rich Presence!"),
+                style: {
+                  marginTop: 5,
+                  padding: "2px 6px",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  backgroundColor: "#5865F2",
+                  color: "#FFFFFF",
+                  border: "none",
+                },
               },
-            },
-            "Custom Button"
-          )
-        );
-      } catch (e) {
-        logger.error("BetterRichPresencePreview error", e);
-      }
+              "Custom Button"
+            )
+          );
+        } catch (e) {
+          logger.error("BetterRichPresencePreview error", e);
+        }
+      });
+
+      unpatches.push(u);
     });
+
+    logger.log("BetterRichPresencePreview: patch applied");
   },
 
-  onUnload() {
-    if (this.patch) this.patch.unpatch();
+  onUnload: () => {
+    unpatches.forEach(u => u());
+    unpatches = [];
     logger.log("BetterRichPresencePreview unloaded");
   },
 };

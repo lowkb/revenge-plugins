@@ -1,33 +1,26 @@
 import { FluxDispatcher } from "@vendetta/metro/common";
-import { logger } from "@vendetta";
-
-let interval: NodeJS.Timer;
-
-function getRandomInterval(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
+import { patcher, logger } from "@vendetta";
 
 export default {
+  patch: null as any,
+
   onLoad() {
     logger.log("AlwaysActive plugin loaded");
 
-    const sendHeartbeat = () => {
-      FluxDispatcher.dispatch({
-        type: "IDLE",
-        idle: false
-      });
-      logger.log("Sent active heartbeat to prevent idle");
+    this.patch = patcher.before(
+      "dispatch",
+      FluxDispatcher,
+      ([event]: [{ type: string; idle?: boolean }]) => {
+        if (event.type !== "IDLE") return;
 
-      // ustaw następny heartbeat w losowym czasie 15–30 sekund
-      interval = setTimeout(sendHeartbeat, getRandomInterval(15000, 30000));
-    };
-
-    // rozpocznij pierwsze wysyłanie
-    sendHeartbeat();
+        logger.log("Patched IDLE event -> forcing active", event);
+        return [{ ...event, idle: false }];
+      }
+    );
   },
 
   onUnload() {
-    clearTimeout(interval);
+    if (this.patch) this.patch.unpatch();
     logger.log("AlwaysActive plugin unloaded");
   }
 };

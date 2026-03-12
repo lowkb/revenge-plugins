@@ -2,121 +2,145 @@ import { React, ReactNative } from "@vendetta/metro/common";
 import { Forms } from "@vendetta/ui/components";
 import { useProxy } from "@vendetta/storage";
 import { storage } from "@vendetta/plugin";
-import { getAssetIDByName } from "@vendetta/ui/assets";
-import type { Activity } from "./types";
 
-const { FormInput, FormSection, FormSwitchRow, FormIcon } = Forms;
-
-const Icons = {
-  RPC: getAssetIDByName("ic_rich_presence")
-};
+const { FormInput, FormSection, FormSwitchRow } = Forms;
 
 export default function Settings() {
   useProxy(storage);
 
-  const activity: Activity = {
-    name: storage.name ?? "",
-    application_id: storage.application_id ?? "",
-    type: storage.type ?? 0,
-    details: storage.details ?? "",
-    state: storage.state ?? "",
-    timestamps: storage.timestamps ?? { _enabled: false, start: Date.now() },
-    assets: storage.assets ?? { large_image: "", large_text: "", small_image: "", small_text: "" },
-    buttons: storage.buttons ?? [{ label: "", url: "" }, { label: "", url: "" }],
-    metadata: storage.metadata ?? {}
-  };
+  storage.name ??= "Test Name";
+  storage.application_id ??= "1481582227333709844";
+  storage.details ??= "Test Detail";
+  storage.state ??= "Test State";
+  storage.type ??= 0;
 
-  const updateStorage = (key: keyof Activity, value: any) => {
-    storage[key] = value;
-  };
+  storage.timestampsEnabled ??= true;
+  storage.timestampStart ??= Date.now();
+
+  storage.assets ??= {};
+  storage.assets.large_image ??= "large";
+  storage.assets.large_text ??= "test large";
+  storage.assets.small_image ??= "small";
+  storage.assets.small_text ??= "test small";
+
+  storage.buttons ??= ["Button One", "Button Two"];
+  storage.metadata ??= {};
+  storage.metadata.button_urls ??= [
+    "https://example.com",
+    "https://example.com"
+  ];
 
   return (
     <ReactNative.ScrollView style={{ flex: 1, padding: 16 }}>
       <FormSection title="Basic" titleStyleType="no_border">
         <FormInput
           title="Name"
-          placeholder="name"
-          value={activity.name}
-          leading={<FormIcon source={Icons.RPC} />}
-          onChange={v => updateStorage("name", v)}
+          value={storage.name}
+          onChange={v => (storage.name = v)}
         />
+
         <FormInput
           title="Application ID"
-          placeholder="Discord Application ID"
-          value={activity.application_id}
-          onChange={v => updateStorage("application_id", v)}
+          value={storage.application_id}
+          onChange={v => (storage.application_id = v)}
         />
+
         <FormInput
           title="Details"
-          placeholder="detail"
-          value={activity.details}
-          onChange={v => updateStorage("details", v)}
+          value={storage.details}
+          onChange={v => (storage.details = v)}
         />
+
         <FormInput
           title="State"
-          placeholder="state"
-          value={activity.state}
-          onChange={v => updateStorage("state", v)}
+          value={storage.state}
+          onChange={v => (storage.state = v)}
         />
       </FormSection>
 
       <FormSection title="Assets" titleStyleType="no_border">
         <FormInput
           title="Large Image Key"
-          value={activity.assets.large_image}
-          onChange={v => updateStorage("assets", { ...activity.assets, large_image: v })}
+          value={storage.assets.large_image}
+          onChange={v =>
+            (storage.assets = { ...storage.assets, large_image: v })
+          }
         />
+
         <FormInput
           title="Large Text"
-          value={activity.assets.large_text}
-          onChange={v => updateStorage("assets", { ...activity.assets, large_text: v })}
+          value={storage.assets.large_text}
+          onChange={v =>
+            (storage.assets = { ...storage.assets, large_text: v })
+          }
         />
+
         <FormInput
           title="Small Image Key"
-          value={activity.assets.small_image}
-          onChange={v => updateStorage("assets", { ...activity.assets, small_image: v })}
+          value={storage.assets.small_image}
+          onChange={v =>
+            (storage.assets = { ...storage.assets, small_image: v })
+          }
         />
+
         <FormInput
           title="Small Text"
-          value={activity.assets.small_text}
-          onChange={v => updateStorage("assets", { ...activity.assets, small_text: v })}
+          value={storage.assets.small_text}
+          onChange={v =>
+            (storage.assets = { ...storage.assets, small_text: v })
+          }
         />
       </FormSection>
 
       <FormSection title="Timestamps" titleStyleType="no_border">
         <FormSwitchRow
           label="Enable timestamps"
-          value={activity.timestamps._enabled}
-          onValueChange={v => updateStorage("timestamps", { ...activity.timestamps, _enabled: v })}
+          value={storage.timestampsEnabled}
+          onValueChange={v => (storage.timestampsEnabled = v)}
         />
       </FormSection>
 
       <FormSection title="Buttons" titleStyleType="no_border">
-        {activity.buttons.map((b, i) => (
-          <ReactNative.View key={i}>
-            <FormInput
-              title={`Button ${i + 1} Label`}
-              placeholder="Label"
-              value={b.label}
-              onChange={v => {
-                const newButtons = [...activity.buttons];
-                newButtons[i].label = v;
-                updateStorage("buttons", newButtons);
-              }}
-            />
-            <FormInput
-              title={`Button ${i + 1} URL`}
-              placeholder="https://example.com"
-              value={b.url}
-              onChange={v => {
-                const newButtons = [...activity.buttons];
-                newButtons[i].url = v;
-                updateStorage("buttons", newButtons);
-              }}
-            />
-          </ReactNative.View>
-        ))}
+        <FormInput
+          title="Button 1 Label"
+          value={storage.buttons[0]}
+          onChange={v => {
+            const arr = [...storage.buttons];
+            arr[0] = v;
+            storage.buttons = arr;
+          }}
+        />
+
+        <FormInput
+          title="Button 1 URL"
+          value={storage.metadata.button_urls[0]}
+          onChange={v => {
+            const arr = [...storage.metadata.button_urls];
+            arr[0] = v;
+            storage.metadata = { button_urls: arr };
+          }}
+        />
+
+        <FormInput
+          title="Button 2 Label"
+          value={storage.buttons[1]}
+          onChange={v => {
+            const arr = [...storage.buttons];
+            arr[1] = v;
+            storage.buttons = arr;
+          }}
+        />
+
+        <FormInput
+          title="Button 2 URL"
+          value={storage.metadata.button_urls[1]}
+          onChange={v => {
+            const arr = [...storage.metadata.button_urls];
+            arr[1] = v;
+            storage.metadata = { button_urls: arr };
+          }}
+        />
       </FormSection>
     </ReactNative.ScrollView>
   );
-      }
+    }

@@ -1,10 +1,11 @@
-import { storage } from "@vendetta";
+import { storage, logger } from "@vendetta";
 import Settings from "./settings";
 import { sendRPC } from "./rpc";
 import type { Activity } from "./types";
 
 export default {
   onLoad() {
+    logger.log("Discord rich presents on");
     sendRPC({
       application_id: storage.application_id,
       name: storage.name,
@@ -18,6 +19,7 @@ export default {
     });
   },
   onUnload() {
+        logger.log("Discord rich presents off");
     sendRPC({ application_id: "", name: "" });
   },
   settings: Settings

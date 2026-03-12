@@ -1,64 +1,90 @@
-import { React, ReactNative as RN } from "@vendetta/metro/common";
-import { Forms, ErrorBoundary, FormIcon } from "@vendetta/ui/components";
-import { useProxy } from "@vendetta/storage";
-import { storage } from "@vendetta/plugin";
-import { getAssetIDByName } from "@vendetta/ui/assets";
-import { Activity } from "./rpc";
+import { Forms, General } from "@vendetta/ui/components";
+import { storage } from "@vendetta";
+import { RPCSettings } from "./types";
 
-const { FormInput, FormSection, FormSwitchRow } = Forms;
+export const Settings = () => {
+  const updateStorage = (key: keyof RPCSettings, value: any) => {
+    storage[key] = value;
+  };
 
-const typedStorage = storage as typeof storage & {
-    selected: string;
-    selections: Record<string, Activity>;
+  return (
+    <General.Section title="Discord Rich Presence Settings">
+      <Forms.Text
+        label="Application ID"
+        defaultValue={storage.application_id || ""}
+        onChange={(v) => updateStorage("application_id", v)}
+      />
+      <Forms.Text
+        label="Name"
+        defaultValue={storage.name || ""}
+        onChange={(v) => updateStorage("name", v)}
+      />
+      <Forms.Text
+        label="Details"
+        defaultValue={storage.details || ""}
+        onChange={(v) => updateStorage("details", v)}
+      />
+      <Forms.Text
+        label="State"
+        defaultValue={storage.state || ""}
+        onChange={(v) => updateStorage("state", v)}
+      />
+      <Forms.Text
+        label="Large Image Key"
+        defaultValue={storage.assets?.large_image || ""}
+        onChange={(v) => {
+          storage.assets = { ...(storage.assets || {}), large_image: v };
+        }}
+      />
+      <Forms.Text
+        label="Large Image Text"
+        defaultValue={storage.assets?.large_text || ""}
+        onChange={(v) => {
+          storage.assets = { ...(storage.assets || {}), large_text: v };
+        }}
+      />
+      <Forms.Text
+        label="Small Image Key"
+        defaultValue={storage.assets?.small_image || ""}
+        onChange={(v) => {
+          storage.assets = { ...(storage.assets || {}), small_image: v };
+        }}
+      />
+      <Forms.Text
+        label="Small Image Text"
+        defaultValue={storage.assets?.small_text || ""}
+        onChange={(v) => {
+          storage.assets = { ...(storage.assets || {}), small_text: v };
+        }}
+      />
+      <Forms.Text
+        label="Button 1 Label"
+        defaultValue={storage.buttons?.[0] || ""}
+        onChange={(v) => {
+          storage.buttons = [v, storage.buttons?.[1] || ""];
+        }}
+      />
+      <Forms.Text
+        label="Button 1 URL"
+        defaultValue={storage.metadata?.button_urls?.[0] || ""}
+        onChange={(v) => {
+          storage.metadata = { button_urls: [v, storage.metadata?.button_urls?.[1] || ""] };
+        }}
+      />
+      <Forms.Text
+        label="Button 2 Label"
+        defaultValue={storage.buttons?.[1] || ""}
+        onChange={(v) => {
+          storage.buttons = [storage.buttons?.[0] || "", v];
+        }}
+      />
+      <Forms.Text
+        label="Button 2 URL"
+        defaultValue={storage.metadata?.button_urls?.[1] || ""}
+        onChange={(v) => {
+          storage.metadata = { button_urls: [storage.metadata?.button_urls?.[0] || "", v] };
+        }}
+      />
+    </General.Section>
+  );
 };
-
-const Icons = {
-    RPC: getAssetIDByName("ic_rich_presence")
-};
-
-export default function Settings() {
-    useProxy(typedStorage);
-    const activity = typedStorage.selections[typedStorage.selected] ?? {
-        name: "",
-        application_id: "",
-        type: 0,
-        details: "",
-        state: "",
-        timestamps: { _enabled: false, start: Date.now() },
-        assets: { large_image: "", large_text: "", small_image: "", small_text: "" },
-        buttons: [{ label: "", url: "" }, { label: "", url: "" }]
-    };
-
-    return (
-        <ErrorBoundary>
-            <RN.ScrollView style={{ flex: 1, padding: 16 }}>
-                <FormSection title="Basic" titleStyleType="no_border">
-                    <FormInput title="Name" placeholder="name" value={activity.name} leading={<FormIcon source={Icons.RPC} />} onChange={v => activity.name = v} />
-                    <FormInput title="Application ID" placeholder="Discord Application ID" value={activity.application_id} onChange={v => activity.application_id = v} />
-                    <FormInput title="Details" placeholder="detail" value={activity.details} onChange={v => activity.details = v} />
-                    <FormInput title="State" placeholder="state" value={activity.state} onChange={v => activity.state = v} />
-                </FormSection>
-
-                <FormSection title="Assets" titleStyleType="no_border">
-                    <FormInput title="Large Image Key" value={activity.assets.large_image} onChange={v => activity.assets.large_image = v} />
-                    <FormInput title="Large Text" value={activity.assets.large_text} onChange={v => activity.assets.large_text = v} />
-                    <FormInput title="Small Image Key" value={activity.assets.small_image} onChange={v => activity.assets.small_image = v} />
-                    <FormInput title="Small Text" value={activity.assets.small_text} onChange={v => activity.assets.small_text = v} />
-                </FormSection>
-
-                <FormSection title="Timestamps" titleStyleType="no_border">
-                    <FormSwitchRow label="Enable timestamps" value={activity.timestamps._enabled} onValueChange={v => activity.timestamps._enabled = v} />
-                </FormSection>
-
-                <FormSection title="Buttons" titleStyleType="no_border">
-                    {activity.buttons.map((b, i) => (
-                        <RN.View key={i}>
-                            <FormInput title={`Button ${i + 1} Label`} placeholder="Label" value={b.label} onChange={v => b.label = v} />
-                            <FormInput title={`Button ${i + 1} URL`} placeholder="https://example.com" value={b.url} onChange={v => b.url = v} />
-                        </RN.View>
-                    ))}
-                </FormSection>
-            </RN.ScrollView>
-        </ErrorBoundary>
-    );
-}

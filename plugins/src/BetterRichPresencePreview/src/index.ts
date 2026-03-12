@@ -1,26 +1,25 @@
 import { showToast } from "@vendetta/ui/toasts";
-import { before } from '@vendetta/patcher';
-import { findByProps } from "@vendetta/metro";
 import { getAssetIDByName } from '@vendetta/ui/assets';
+const bunny = window.bunny.api.react.jsx;
 
-const LazyActionSheet = findByProps("openLazy", "hideActionSheet");
+function logComponent(component: any, ret: any) {
+    if (!component || !ret) return;
 
-function SheetOutput(key: string) {
-    console.log(`[ActionSheetFinder] Opened: ${key}`);
-    showToast(`[ActionSheetFinder] Opened: ${key}`, getAssetIDByName("Check"));
+    const cmpName = component.displayName || component.name || "UnknownComponent";
+    const retName = ret.type?.displayName || ret.type?.name || "UnknownRet";
+
+    const msg = `[JSXLogger] ${cmpName} -> ${retName}`;
+    console.log(msg);
+    showToast(msg, getAssetIDByName("Check"));
 }
-
-// patch dla wszystkich openLazy
-const unpatchOpenLazy = before("openLazy", LazyActionSheet, ([_, key]) => {
-    SheetOutput(key);
-});
 
 export default {
     onLoad() {
-        console.log("[ActionSheetFinder] Loaded!");
+        console.log("[JSXLogger] Loaded!");
+        bunny.onJsxCreate("*", logComponent);
     },
     onUnload() {
-        unpatchOpenLazy?.();
-        console.log("[ActionSheetFinder] Unloaded!");
+        // nie ma unpatcha bo onJsxCreate nie zwraca funkcji unpatch, jeśli trzeba można zrobić własny mechanizm
+        console.log("[JSXLogger] Unloaded!");
     },
 };

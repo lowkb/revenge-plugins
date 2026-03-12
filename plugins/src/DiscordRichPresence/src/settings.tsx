@@ -2,7 +2,7 @@ import { Forms, General } from "@vendetta/ui/components";
 import { storage } from "@vendetta";
 import { RPCSettings } from "./types";
 
-export const Settings = () => {
+export default () => {
   const updateStorage = (key: keyof RPCSettings, value: any) => {
     storage[key] = value;
   };

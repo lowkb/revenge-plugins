@@ -58,9 +58,9 @@ export default {
   onLoad() {
     sendActivity({
       application_id: "1481683449885495437",
-      name: "Test Name",
-      details: "Test Detail",
-      state: "Test State",
+      name: "my best rich presence",
+      details: "i am active 24/7",
+      state: "by me",
       type: 0,
       flags: 1 << 0,
       timestamps: { start: Date.now() },

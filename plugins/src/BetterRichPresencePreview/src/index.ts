@@ -5,20 +5,19 @@ export default {
   onLoad: () => {
     logger.log("RichPresencePreview loaded");
 
-    // Patch wszystkich JSX-ów
     bunny.onJsxCreate("*", (component, ret) => {
-      if (!ret || !ret.props) return ret;
+      // Zabezpieczenie przed undefined
+      if (!component && !ret) return;
 
-      // jeśli komponent ma właściwość 'activities', logujemy ją
-      if (ret.props.activities) {
-        logger.log(
-          `Found Rich Presence in component ${component.displayName || "unknown"}`,
-          ret.props.activities
-        );
-        // dla wygody możemy trzymać w globalu
-        window.lastRichPresence = ret.props.activities;
-      }
-      return ret;
+      // Nazwa komponentu (displayName lub nazwa funkcji/klasy)
+      const name = component?.displayName || component?.name || "unknown";
+
+      // Log propsów, jeśli są
+      const props = ret?.props ? JSON.stringify(ret.props) : "{}";
+
+      logger.log(`[JSX CREATE] Component: ${name}`, props);
+
+      return ret; // zawsze zwracaj ret, żeby klient nie crashował
     });
   },
 

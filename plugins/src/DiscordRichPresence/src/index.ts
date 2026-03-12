@@ -12,11 +12,10 @@ export default {
         details: "Test Detail",
         state: "Test State",
         type: 0,
-        flags: 0,
+        flags: 1 << 0,
         timestamps: {
-      _enabled: false,
-      start: Date.now(),
-    },
+          start: Date.now()
+        },
         assets: {
           large_image: "large",
           large_text: "test large",
@@ -39,7 +38,7 @@ export default {
       type: "LOCAL_ACTIVITY_UPDATE",
       pid: 1608,
       socketId: "rpc",
-      activity: { name: "", type: 0 }
+      activity: { name:"", type:0 }
     });
   }
 };

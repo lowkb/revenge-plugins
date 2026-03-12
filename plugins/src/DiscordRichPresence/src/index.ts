@@ -13,6 +13,7 @@ export default {
         state: "Test State",
         type: 0,
         flags: 1 << 0,
+        instance: true,
         timestamps: {
           start: Date.now()
         },

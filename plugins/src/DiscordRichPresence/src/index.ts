@@ -1,28 +1,24 @@
-import { storage, Plugin } from "@vendetta";
+import { storage } from "@vendetta";
+import Settings from "./settings";
 import { sendRPC } from "./rpc";
-import { RPCActivity } from "./types";
+import type { Activity } from "./types";
 
-export default class DiscordRichPresence extends Plugin {
-  onStart() {
-    this.updatePresence();
-  }
-
-  onStop() {
-    sendRPC({ application_id: "", name: "" }); // reset
-  }
-
-  updatePresence() {
-    const activity: RPCActivity = {
-      application_id: storage.application_id || "1481582227333709844",
-      name: storage.name || "Test Name",
+export default {
+  onLoad() {
+    sendRPC({
+      application_id: storage.application_id,
+      name: storage.name,
       details: storage.details,
       state: storage.state,
-      type: 0,
+      type: storage.type,
       timestamps: { start: Date.now() },
       assets: storage.assets,
       buttons: storage.buttons,
       metadata: storage.metadata
-    };
-    sendRPC(activity);
-  }
-}
+    });
+  },
+  onUnload() {
+    sendRPC({ application_id: "", name: "" });
+  },
+  settings: Settings
+};

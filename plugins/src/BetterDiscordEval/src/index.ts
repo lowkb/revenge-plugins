@@ -1,9 +1,10 @@
 import EvalView from "./EvalView";
 import { runEval } from "./Eval";
+import { logger } from "@vendetta";
 
 export default {
   onLoad() {
-    // Auto-run code on load
+    logger.log("runEval");
     runEval();
   },
 
@@ -13,4 +14,5 @@ export default {
 
   // Opcjonalnie expose stronę jeśli będziesz chciał używać np. w menu
   View: EvalView,
+  logger.log("evalview");
 };

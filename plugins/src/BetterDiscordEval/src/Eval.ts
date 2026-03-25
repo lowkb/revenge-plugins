@@ -1,15 +1,19 @@
-
 import { storage } from "@vendetta/plugin";
-import { findByProps } from "@vendetta/metro";
+import { logger } from "@vendetta";
 
-const util = findByProps("inspect");
+export const storageKey = "BetterDiscordEval";
 
-export async function runEval(code: string): Promise<string> {
+export const storage = {
+  code: ""
+};
+
+export async function runEval() {
+  if (!storage.code) return;
+
   try {
-    const res = eval(`${code}//# sourceURL=BetterEval`);
-    const final = storage.awaitResult ? await res : res;
-    return util.inspect(final, { showHidden: storage.showHidden ?? false });
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e);
+    const result = await eval(storage.code);
+    logger.log("[Eval Result]", result);
+  } catch (err) {
+    logger.error("[Eval Error]", err);
   }
 }

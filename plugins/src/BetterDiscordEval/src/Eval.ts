@@ -1,21 +1,19 @@
-import { runEval } from "./Eval";
-import { registerSettingsTile } from "./settingsTile";
-import EvalView from "./EvalView";
-import { manifest } from "@vendetta/plugin";
+import { storage } from "@vendetta/plugin";
+import { logger } from "@vendetta";
 
-export default {
-  onLoad() {
-    registerSettingsTile({
-      key: "BetterDiscordEval",
-      title: () => "BetterDiscord Eval",
-      page: EvalView,
-    });
+export const storageKey = "BetterDiscordEval";
 
-    // Optional: auto-run code on load
-    runEval();
-  },
-
-  onUnload() {
-    // Nothing special to unload
-  },
+export const storage = {
+  code: ""
 };
+
+export async function runEval() {
+  if (!storage.code) return;
+
+  try {
+    const result = await eval(storage.code);
+    logger.log("[Eval Result]", result);
+  } catch (err) {
+    logger.error("[Eval Error]", err);
+  }
+}

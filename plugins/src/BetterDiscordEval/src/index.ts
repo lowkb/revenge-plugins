@@ -14,5 +14,4 @@ export default {
 
   // Opcjonalnie expose stronę jeśli będziesz chciał używać np. w menu
   View: EvalView,
-  logger.log("evalview");
 };

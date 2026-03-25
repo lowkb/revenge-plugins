@@ -1,18 +1,16 @@
-import { registerSettingsTile } from "./settingsTile"; // Twój registerSettingsTile
 import EvalView from "./EvalView";
-import { manifest } from "@vendetta/plugin";
+import { runEval } from "./Eval";
 
 export default {
   onLoad() {
-    registerSettingsTile({
-      key: "better_eval",
-      title: () => "Better Eval",
-      icon: "FileIcon", // podmień na odpowiednią ikonę
-      page: EvalView
-    });
-    console.log("[BetterEval] Loaded");
+    // Auto-run code on load
+    runEval();
   },
+
   onUnload() {
-    console.log("[BetterEval] Unloaded");
-  }
+    // Nothing special to unload
+  },
+
+  // Opcjonalnie expose stronę jeśli będziesz chciał używać np. w menu
+  View: EvalView,
 };

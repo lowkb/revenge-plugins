@@ -1,54 +1,67 @@
-import { React, ReactNative } from "@vendetta/metro/common";
-import { Codeblock, Stack, Button, TextArea } from "@vendetta/ui/components";
-import { storage } from "@vendetta/plugin";
+import { React, ReactNative as RN } from "@vendetta/metro/common";
 import { findByProps } from "@vendetta/metro";
+import { Stack, Button, TableRowGroup, TableSwitchRow, TextArea } from "@vendetta/ui/components";
+import { useProxy } from "@vendetta/storage";
+import { storage } from "@vendetta/plugin";
 
 const util = findByProps("inspect");
 
 export function EvalPage() {
+  useProxy(storage);
+
   const [code, setCode] = React.useState("");
   const [result, setResult] = React.useState("undefined");
 
-  return (
-    <ReactNative.ScrollView contentContainerStyle={{ padding: 16 }}>
-      <Stack spacing={16}>
-        <TextArea
-          placeholder="Wpisz kod do eval"
-          onChange={(v) => setCode(v)}
-        />
-
-        <Button
-          text="Evaluate"
-          onPress={async function () {
+  return RN.ScrollView({
+    contentContainerStyle: { padding: 16 },
+    children: Stack({
+      spacing: 16,
+      children: [
+        TextArea({
+          placeholder: "Enter JS code...",
+          value: code,
+          onChange: setCode,
+        }),
+        TableRowGroup({
+          children: [
+            TableSwitchRow({
+              label: "Await result",
+              value: storage.awaitResult,
+              onValueChange: (v) => (storage.awaitResult = v),
+            }),
+            TableSwitchRow({
+              label: "Show hidden",
+              value: storage.showHidden,
+              onValueChange: (v) => (storage.showHidden = v),
+            }),
+          ],
+        }),
+        Button({
+          text: "Evaluate",
+          onPress: async function () {
             try {
-              let res = (0, eval)(`${code}//# sourceURL=BetterEval`);
-              if (storage.awaitResult) res = await res;
-
-              // Render React element live lub string/obiekt w Codeblock
-              if (typeof res === "object" && res?.$$typeof) {
-                setResult(res); // React element renderuje się live
-              } else {
-                setResult(util.inspect(res, { showHidden: storage.showHidden }));
-              }
+              const res = eval(`${code}//# sourceURL=BetterEval`);
+              const final = storage.awaitResult ? await res : res;
+              setResult(util.inspect(final, { showHidden: storage.showHidden }));
             } catch (e) {
               setResult(util.inspect(e));
             }
-          }}
-        />
-
-        {typeof result === "object" && result?.$$typeof
-          ? result
-          : <Codeblock>{result}</Codeblock>}
-      </Stack>
-    </ReactNative.ScrollView>
-  );
+          },
+        }),
+        TextArea({
+          value: result,
+          editable: false,
+        }),
+      ],
+    }),
+  });
 }
 
 export default {
   onLoad() {
-    // nic nie trzeba
+    console.log("[BetterEval] Loaded");
   },
   onUnload() {
-    // nic nie trzeba
+    console.log("[BetterEval] Unloaded");
   },
 };

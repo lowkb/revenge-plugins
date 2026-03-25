@@ -7,7 +7,7 @@ export default {
     registerSettingsTile({
       key: "better_eval",
       title: () => "Better Eval",
-      icon: 12345, // podmień na odpowiednią ikonę
+      icon: "FileIcon", // podmień na odpowiednią ikonę
       page: EvalView
     });
     console.log("[BetterEval] Loaded");

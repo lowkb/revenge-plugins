@@ -1,21 +1,22 @@
-import { Forms } from "@vendetta/ui/components";
+import { React, ReactNative } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
-import { React } from "@vendetta/metro/common";
+import { useProxy } from "@vendetta/storage";
+import { Forms } from "@vendetta/ui/components";
 
-const Settings = () => {
+const { View, ScrollView } = ReactNative;
+
+export default function Settings() {
+    useProxy(storage);
+
     return (
-        <Forms.FormSection title="Hide Blocked & Ignored Messages">
-            <Forms.FormRow
-                label="Hide blocked/ignored messages"
-                trailing={
-                    <Forms.FormSwitch
-                        value={storage.hideBlocked ?? true}
-                        onValueChange={(v) => (storage.hideBlocked = v)}
-                    />
-                }
-            />
-        </Forms.FormSection>
+        <ScrollView>
+            <View>
+                <Forms.FormSwitchRow
+                    label="Hide blocked & ignored users"
+                    value={storage.enabled ?? true}
+                    onValueChange={(v: boolean) => (storage.enabled = v)}
+                />
+            </View>
+        </ScrollView>
     );
-};
-
-export default Settings;
+}

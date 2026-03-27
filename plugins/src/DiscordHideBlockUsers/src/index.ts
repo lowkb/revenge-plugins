@@ -26,57 +26,36 @@ let patches: (() => void)[] = [];
 
 const startPlugin = () => {
     try {
-        // 🔹 Patch dispatcher do filtrowania wiadomości przy ładowaniu i tworzeniu nowych
-        const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
-            if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                logger.log(`[Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length}`);
-                event.messages = event.messages.filter((msg: any) => {
-                    const filtered = filterMessage(msg);
-                    if (filtered) logger.log(`[Debug] Filtered (LOAD): ${msg.author?.username}`);
-                    return !filtered;
-                });
+                const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
+            if (event.type === "LOAD_MESSAGES_SUCCESS") {
+                event.messages = event.messages.filter(
+                    (msg) => !filterReplies(msg)
+                );
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                const author = event.message?.author?.username;
-                logger.log(`[Debug] ${event.type}: ${author}`);
-                if (filterMessage(event.message)) {
-                    // 🔹 ustawienie channelId = "0" aby wiadomość nie pokazywała się w chat
+                if (filterReplies(event.message)) {
                     event.channelId = "0";
-                    logger.log(`[Debug] Filtered (LIVE): ${author}`);
                 }
             }
         });
         patches.push(patch1);
 
-        // 🔹 Patch RowManager.generate do usuwania wierszy (wiadomości + systemowe powiadomienia)
-        const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
-            if (!data) return;
-
-            // 🔹 Usuń systemowe powiadomienia typu "x zablokowanych wiadomości"
-            if (typeof data.rowType === "string") {
-                if (
-                    data.rowType.includes("blocked") ||
-                    data.rowType.includes("ignored") ||
-                    data.rowType === "blocked_messages"
-                ) {
-                    data.cancel = true;
-                    logger.log(`[Debug] Removed blocked container row`);
-                    return;
+        // Patch render
+        const patch2 = before("generate", RowManager.prototype, ([data]) => {
+            if (filterReplies(data.message)) {
+                data.renderContentOnly = true;
+                data.message.content = null;
+                data.message.reactions = [];
+                data.message.canShowComponents = false;
+                if (data.rowType === 2) {
+                    data.roleStyle = "";
+                    data.revealed = false;
+                    data.content = [];
                 }
-            }
-
-            if (!data.message) return;
-
-            const msg = data.message;
-
-            if (filterMessage(msg)) {
-                data.cancel = true;
-                logger.log(`[Debug] Row removed: ${msg.author?.username}`);
             }
         });
         patches.push(patch2);
-
         logger.log(`[DiscordHideBlockUsers]: Plugin loaded`);
     } catch (err) {
         logger.error(`[DiscordHideBlockUsers]: Error loading plugin`, err);

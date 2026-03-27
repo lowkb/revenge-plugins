@@ -30,12 +30,8 @@ const startPlugin = () => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
                 logger.log(`[Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length}`);
 
-                event.messages.forEach((msg: any, i: number) => {
+                event.messages.forEach((msg: any) => {
                     if (filterMessage(msg)) {
-                        msg.content = null;
-                        msg.reactions = [];
-                        msg.canShowComponents = false;
-
                         logger.log(`[Debug] Filtered (LOAD): ${msg.author?.username}`);
                     }
                 });
@@ -45,10 +41,6 @@ const startPlugin = () => {
                 logger.log(`[Debug] ${event.type}: ${event.message?.author?.username}`);
 
                 if (filterMessage(event.message)) {
-                    event.message.content = null;
-                    event.message.reactions = [];
-                    event.message.canShowComponents = false;
-
                     logger.log(`[Debug] Filtered (LIVE): ${event.message.author?.username}`);
                 }
             }
@@ -66,14 +58,8 @@ const startPlugin = () => {
             logger.log(`[Debug] Row: ${msg.author?.username} | rowType: ${data.rowType}`);
 
             if (filterMessage(msg)) {
-                data.renderContentOnly = true;
-data.text = "";
-data.content = [];
-data.message.content = null;
-data.message.reactions = [];
-data.message.canShowComponents = false;
-
-                logger.log(`[Debug] Row filtered: ${msg.author?.username}`);
+                data.cancel = true;
+                logger.log(`[Debug] Row removed: ${msg.author?.username}`);
             }
         });
         patches.push(patch2);

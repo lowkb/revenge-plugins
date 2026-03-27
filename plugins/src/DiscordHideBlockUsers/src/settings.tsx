@@ -12,9 +12,9 @@ export default function Settings() {
         <ScrollView>
             <View>
                 <Forms.FormSwitchRow
-                    label="Silent filter"
-                    value={storage.silentFilter ?? true}
-                    onValueChange={(v) => (storage.silentFilter = v)}
+                    label="Hide messages from blocked/ignored users"
+                    value={storage.hideMessages ?? true}
+                    onValueChange={(v) => (storage.hideMessages = v)}
                 />
             </View>
         </ScrollView>

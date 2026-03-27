@@ -5,27 +5,41 @@ import { logger } from "@vendetta";
 import { storage } from "@vendetta/plugin";
 import Settings from "./settings";
 
-const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 const RowManager = findByName("RowManager");
+const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 
 const pluginName = "HideBlockedAndIgnoredMessages";
 let patches: (() => void)[] = [];
 
-const shouldHide = (msg: any) => {
-    if (!msg?.author?.id) return false;
-    if (!storage.enabled) return false;
+// 🔥 Twoja logika (lekko poprawiona)
+const isFilteredUser = (id: string) => {
+    if (!id) return false;
+    if (storage.blocked && isBlocked(id)) return true;
+    if (storage.ignored && isIgnored(id)) return true;
+    return false;
+};
 
-    const id = msg.author.id;
-    return isBlocked(id) || isIgnored(id);
+const filterReplies = (msg: any) => {
+    if (!msg) return false;
+
+    if (isFilteredUser(msg.author?.id)) return true;
+
+    if (storage.removeReplies && msg.referenced_message) {
+        if (isFilteredUser(msg.referenced_message.author?.id)) return true;
+    }
+
+    return false;
 };
 
 const startPlugin = () => {
     try {
-        // 🔥 usuwa wiadomości zanim trafią do UI
+        // 🔥 DATA LAYER (zamiast channelId hacka)
         const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
+            if (!storage.enabled) return;
+
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 event.messages = event.messages.filter(
-                    (msg: any) => !shouldHide(msg)
+                    (msg: any) => !filterReplies(msg)
                 );
             }
 
@@ -33,22 +47,24 @@ const startPlugin = () => {
                 (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") &&
                 event.message
             ) {
-                if (shouldHide(event.message)) {
+                if (filterReplies(event.message)) {
                     event.message = null;
                 }
             }
         });
 
-        // 🔥 usuwa placeholder "1 zablokowana wiadomość"
+        // 🔥 KILL PLACEHOLDER
         const patch2 = before("generate", RowManager.prototype, ([data]) => {
             if (!storage.enabled) return;
 
+            // usuwa "1 zablokowana wiadomość"
             if (data.rowType === 2) {
                 data.render = () => null;
                 return;
             }
 
-            if (shouldHide(data.message)) {
+            // fallback
+            if (filterReplies(data.message)) {
                 data.render = () => null;
             }
         });
@@ -64,6 +80,10 @@ const startPlugin = () => {
 export default {
     onLoad: () => {
         storage.enabled ??= true;
+        storage.blocked ??= true;
+        storage.ignored ??= true;
+        storage.removeReplies ??= true;
+
         startPlugin();
     },
 

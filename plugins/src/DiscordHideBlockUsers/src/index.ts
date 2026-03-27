@@ -28,25 +28,23 @@ const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                logger.log(`[DiscordHideBlockUsers][Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length}`);
+                logger.log(`[Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length}`);
 
                 event.messages.forEach((msg: any, i: number) => {
                     if (filterMessage(msg)) {
-                        msg.filtered = true;
                         msg.content = null;
                         msg.reactions = [];
                         msg.canShowComponents = false;
 
-                        logger.log(`[Debug] Filtered (LOAD) ${i}: ${msg.author?.username}`);
+                        logger.log(`[Debug] Filtered (LOAD): ${msg.author?.username}`);
                     }
                 });
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                logger.log(`[Debug] ${event.type} from: ${event.message?.author?.username}`);
+                logger.log(`[Debug] ${event.type}: ${event.message?.author?.username}`);
 
                 if (filterMessage(event.message)) {
-                    event.message.filtered = true;
                     event.message.content = null;
                     event.message.reactions = [];
                     event.message.canShowComponents = false;
@@ -63,20 +61,22 @@ const startPlugin = () => {
                 return;
             }
 
-            logger.log(`[Debug] Row: ${data.message.author?.username} | rowType: ${data.rowType}`);
+            const msg = data.message;
 
-            if (data.message.filtered) {
+            logger.log(`[Debug] Row: ${msg.author?.username} | rowType: ${data.rowType}`);
+
+            if (filterMessage(msg)) {
                 data.renderContentOnly = true;
-                data.message.content = null;
-                data.message.reactions = [];
-                data.message.canShowComponents = false;
+                msg.content = null;
+                msg.reactions = [];
+                msg.canShowComponents = false;
 
                 data.roleStyle = "";
                 data.revealed = false;
                 data.content = [];
                 data.text = "[Filtered message]";
 
-                logger.log(`[Debug] Row filtered: ${data.message.author?.username}`);
+                logger.log(`[Debug] Row filtered: ${msg.author?.username}`);
             }
         });
         patches.push(patch2);

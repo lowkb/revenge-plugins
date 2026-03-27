@@ -1,0 +1,14 @@
+{
+  "name": "DiscordHideBlockUsers",
+  "description": "Silently hides messages from blocked and ignored users",
+  "authors": [
+    {
+      "name": "low_kb",
+      "id": "1474889588131762206"
+    }
+  ],
+  "main": "src/index.ts",
+  "vendetta": {
+    "icon": "EyeOffIcon"
+  }
+}

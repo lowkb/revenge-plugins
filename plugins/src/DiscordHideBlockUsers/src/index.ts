@@ -30,7 +30,7 @@ export default {
                 d.message.reactions = [];
                 d.message.canShowComponents = false;
                 if (d.rowType === 2) {
-                    d.text = "[Blocked message hidden]";
+                    d.text = "[test]";
                     d.content = [];
                     d.revealed = false;
                     d.roleStyle = "";

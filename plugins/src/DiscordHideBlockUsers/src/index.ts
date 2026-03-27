@@ -18,9 +18,7 @@ const isFilteredUser = (id?: string) => {
 const filterMessage = (msg: any) => {
     if (!msg) return false;
     if (isFilteredUser(msg.author?.id)) return true;
-    if (msg.referenced_message?.author?.id) {
-        if (isFilteredUser(msg.referenced_message.author.id)) return true;
-    }
+    if (msg.referenced_message?.author?.id && isFilteredUser(msg.referenced_message.author.id)) return true;
     return false;
 };
 
@@ -30,11 +28,22 @@ const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
+                event.messages.forEach((msg: any) => {
+                    if (filterMessage(msg)) {
+                        msg.filtered = true;
+                        msg.content = null;
+                        msg.reactions = [];
+                        msg.canShowComponents = false;
+                    }
+                });
             }
+
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
                 if (filterMessage(event.message)) {
-                    event.channelId = "0";
+                    event.message.filtered = true;
+                    event.message.content = null;
+                    event.message.reactions = [];
+                    event.message.canShowComponents = false;
                     logger.log(`[DiscordHideBlockUsers]: Filtered message from ${event.message.author?.username}`);
                 }
             }
@@ -42,7 +51,7 @@ const startPlugin = () => {
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
-            if (filterMessage(data.message)) {
+            if (data.message?.filtered) {
                 data.renderContentOnly = true;
                 data.message.content = null;
                 data.message.reactions = [];
@@ -51,6 +60,7 @@ const startPlugin = () => {
                     data.roleStyle = "";
                     data.revealed = false;
                     data.content = [];
+                    data.text = "[Filtered message. Check plugin settings.]";
                 }
                 logger.log(`[DiscordHideBlockUsers]: Filtered row for message from ${data.message.author?.username}`);
             }

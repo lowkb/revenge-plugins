@@ -67,14 +67,11 @@ const startPlugin = () => {
 
             if (filterMessage(msg)) {
                 data.renderContentOnly = true;
-                msg.content = null;
-                msg.reactions = [];
-                msg.canShowComponents = false;
-
-                data.roleStyle = "";
-                data.revealed = false;
-                data.content = [];
-                data.text = "[Filtered message]";
+data.text = "";
+data.content = [];
+data.message.content = null;
+data.message.reactions = [];
+data.message.canShowComponents = false;
 
                 logger.log(`[Debug] Row filtered: ${msg.author?.username}`);
             }

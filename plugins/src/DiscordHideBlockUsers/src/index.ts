@@ -34,7 +34,7 @@ const startPlugin = () => {
             }
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
                 if (filterMessage(event.message)) {
-                    event.cancel = true;
+                    event.channelId = "0";
                     logger.log(`[DiscordHideBlockUsers]: Filtered message from ${event.message.author?.username}`);
                 }
             }
@@ -43,7 +43,15 @@ const startPlugin = () => {
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
             if (filterMessage(data.message)) {
-                data.cancel = true;
+                data.renderContentOnly = true;
+                data.message.content = null;
+                data.message.reactions = [];
+                data.message.canShowComponents = false;
+                if (data.rowType === 2) {
+                    data.roleStyle = "";
+                    data.revealed = false;
+                    data.content = [];
+                }
                 logger.log(`[DiscordHideBlockUsers]: Filtered row for message from ${data.message.author?.username}`);
             }
         });

@@ -8,8 +8,8 @@ const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 const pluginName = "DiscordHideBlockUsers";
 
-let blockedCache = new Set();
-let ignoredCache = new Set();
+let blockedCache = new Set<string>();
+let ignoredCache = new Set<string>();
 
 const updateCache = () => {
     blockedCache.clear();
@@ -34,6 +34,7 @@ let patches: (() => void)[] = [];
 
 const startPlugin = () => {
     updateCache();
+
     patches.push(
         before("dispatch", FluxDispatcher, ([event]) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
@@ -44,6 +45,7 @@ const startPlugin = () => {
             }
         })
     );
+
     patches.push(
         before("generate", RowManager.prototype, ([data]) => {
             if (filterMessage(data.message)) {
@@ -51,10 +53,13 @@ const startPlugin = () => {
                 data.message.content = null;
                 data.message.reactions = [];
                 data.message.canShowComponents = false;
-                if (data.rowType === 2) data.content = [];
+                data.content = [];
+                data.rowType = 0;       // usuwa placeholder "1 zablokowana wiadomość"
+                data.render = () => null; // całkowicie blokuje renderowanie wiadomości
             }
         })
     );
+
     logger.log(`${pluginName} loaded.`);
 };
 

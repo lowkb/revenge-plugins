@@ -28,29 +28,33 @@ const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                event.messages.forEach((msg: any) => {
+                logger.log(`[DiscordHideBlockUsers][Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length} messages received`);
+                event.messages.forEach((msg: any, i: number) => {
                     if (filterMessage(msg)) {
                         msg.filtered = true;
                         msg.content = null;
                         msg.reactions = [];
                         msg.canShowComponents = false;
+                        logger.log(`[DiscordHideBlockUsers][Debug] Message ${i} filtered: ${msg.author?.username}`);
                     }
                 });
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
+                logger.log(`[DiscordHideBlockUsers][Debug] Event type: ${event.type}, from: ${event.message?.author?.username}`);
                 if (filterMessage(event.message)) {
                     event.message.filtered = true;
                     event.message.content = null;
                     event.message.reactions = [];
                     event.message.canShowComponents = false;
-                    logger.log(`[DiscordHideBlockUsers]: Filtered message from ${event.message.author?.username}`);
+                    logger.log(`[DiscordHideBlockUsers][Debug] MESSAGE_CREATE/UPDATE filtered: ${event.message.author?.username}`);
                 }
             }
         });
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
+            logger.log(`[DiscordHideBlockUsers][Debug] Generating row for message from: ${data.message?.author?.username}, rowType: ${data.rowType}`);
             if (data.message?.filtered) {
                 data.renderContentOnly = true;
                 data.message.content = null;
@@ -62,7 +66,7 @@ const startPlugin = () => {
                     data.content = [];
                     data.text = "[Filtered message. Check plugin settings.]";
                 }
-                logger.log(`[DiscordHideBlockUsers]: Filtered row for message from ${data.message.author?.username}`);
+                logger.log(`[DiscordHideBlockUsers][Debug] Row filtered for message from: ${data.message?.author?.username}`);
             }
         });
         patches.push(patch2);

@@ -10,26 +10,29 @@ const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 const pluginName = "HideBlockedAndIgnoredMessages";
 let patches: (() => void)[] = [];
 
-// Sprawdza, czy wiadomość powinna być ukryta
 const filterMessage = (msg: any) => {
-    if (!msg?.author?.id) return false;
-    if (!storage.hideUsers) return false; // ustawienie OFF → pokazuj wszystkie
-    const id = msg.author.id;
-    return (storage.blocked && isBlocked(id)) || (storage.ignored && isIgnored(id));
+    if (!storage.hideUsers) return false;
+    const id = msg?.author?.id;
+    if (!id) return false;
+    return isBlocked(id) || isIgnored(id);
 };
 
 const startPlugin = () => {
     try {
         const patch = before("dispatch", FluxDispatcher, ([event]) => {
-            if (event.type === "LOAD_MESSAGES_SUCCESS") {
+            if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
                 event.messages = event.messages.filter(msg => !filterMessage(msg));
             }
+
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                if (filterMessage(event.message)) event.channelId = "0";
+                if (filterMessage(event.message)) {
+                    event.message = null;
+                    return false;
+                }
             }
         });
-        patches.push(patch);
 
+        patches.push(patch);
         logger.log(`${pluginName} loaded.`);
     } catch (err) {
         logger.error(`[${pluginName} Error]`, err);
@@ -38,8 +41,6 @@ const startPlugin = () => {
 
 export default {
     onLoad: () => {
-        storage.blocked ??= true;
-        storage.ignored ??= true;
         storage.hideUsers ??= true;
 
         startPlugin();

@@ -40,8 +40,8 @@ const startPlugin = () => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
             }
-            if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                if (filterMessage(event.message)) event.channelId = "0";
+            if ((event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") && filterMessage(event.message)) {
+                event.channelId = "0"; // ignoruje wiadomość
             }
         })
     );
@@ -49,13 +49,7 @@ const startPlugin = () => {
     patches.push(
         before("generate", RowManager.prototype, ([data]) => {
             if (filterMessage(data.message)) {
-                data.renderContentOnly = true;
-                data.message.content = null;
-                data.message.reactions = [];
-                data.message.canShowComponents = false;
-                data.content = [];
-                data.rowType = 0;       // usuwa placeholder "1 zablokowana wiadomość"
-                data.render = () => null; // całkowicie blokuje renderowanie wiadomości
+                data.render = () => null; // całkowicie blokuje renderowanie
             }
         })
     );

@@ -10,24 +10,29 @@ const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 const pluginName = "HideBlockedAndIgnoredMessages";
 let patches: (() => void)[] = [];
 
-const filterMessage = (msg: any) => {
-    if (!storage.hideUsers) return false;
-    const id = msg?.author?.id;
-    if (!id) return false;
+const shouldHide = (msg: any) => {
+    if (!msg?.author?.id) return false;
+    if (!storage.enabled) return false;
+
+    const id = msg.author.id;
     return isBlocked(id) || isIgnored(id);
 };
 
 const startPlugin = () => {
     try {
         const patch = before("dispatch", FluxDispatcher, ([event]) => {
-            if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                event.messages = event.messages.filter(msg => !filterMessage(msg));
+            if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
+                event.messages = event.messages.filter(
+                    (msg: any) => !shouldHide(msg)
+                );
             }
 
-            if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                if (filterMessage(event.message)) {
+            if (
+                (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") &&
+                event.message
+            ) {
+                if (shouldHide(event.message)) {
                     event.message = null;
-                    return false;
                 }
             }
         });
@@ -35,16 +40,14 @@ const startPlugin = () => {
         patches.push(patch);
         logger.log(`${pluginName} loaded.`);
     } catch (err) {
-        logger.error(`[${pluginName} Error]`, err);
+        logger.error(`[${pluginName}]`, err);
     }
 };
 
 export default {
     onLoad: () => {
-        storage.hideUsers ??= true;
-
+        storage.enabled ??= true;
         startPlugin();
-        logger.log(`${pluginName} started.`);
     },
 
     onUnload: () => {

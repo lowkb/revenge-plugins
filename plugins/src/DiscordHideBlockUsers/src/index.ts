@@ -6,6 +6,7 @@ import Settings from "./settings";
 
 const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
+
 const pluginName = "HideBlockedAndIgnoredMessages";
 
 let blockedCache = new Set<string>();
@@ -17,18 +18,16 @@ const updateCache = () => {
 };
 
 const isFilteredUser = (id: string) => {
-    if (!id) return false;
-    if (storage.blocked && (blockedCache.has(id) || isBlocked(id))) return true;
-    if (storage.ignored && (ignoredCache.has(id) || isIgnored(id))) return true;
+    if (!id || !storage.hideMessages) return false;
+    if (blockedCache.has(id) || isBlocked(id)) return true;
+    if (ignoredCache.has(id) || isIgnored(id)) return true;
     return false;
 };
 
 const filterMessage = (msg: any) => {
-    if (!msg) return false;
+    if (!msg || !storage.hideMessages) return false;
     if (isFilteredUser(msg.author?.id)) return true;
-    if (storage.removeReplies && msg.referenced_message) {
-        if (isFilteredUser(msg.referenced_message.author?.id)) return true;
-    }
+    if (msg.referenced_message && isFilteredUser(msg.referenced_message.author?.id)) return true;
     return false;
 };
 
@@ -39,18 +38,28 @@ const startPlugin = () => {
 
     patches.push(
         before("dispatch", FluxDispatcher, ([event]) => {
+            if (!storage.hideMessages) return; // jeśli OFF, nic nie filtrujemy
+
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
             }
-            if ((event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") && filterMessage(event.message)) {
-                event.channelId = "0";
+
+            if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
+                if (filterMessage(event.message)) event.channelId = "0";
             }
         })
     );
 
     patches.push(
         before("generate", RowManager.prototype, ([data]) => {
+            if (!storage.hideMessages) return; // jeśli OFF, nic nie filtrujemy
             if (filterMessage(data.message)) {
+                data.rowType = 0;
+                data.renderContentOnly = true;
+                data.content = [];
+                data.message.content = null;
+                data.message.reactions = [];
+                data.message.canShowComponents = false;
                 data.render = () => null;
             }
         })
@@ -61,9 +70,7 @@ const startPlugin = () => {
 
 export default {
     onLoad: () => {
-        storage.blocked ??= true;
-        storage.ignored ??= true;
-        storage.removeReplies ??= true;
+        storage.hideMessages ??= true;
         startPlugin();
     },
     onUnload: () => {

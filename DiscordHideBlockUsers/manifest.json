@@ -1,1 +1,1 @@
-{"name":"DiscordHideBlockUsers","description":"Silently hides messages from blocked and ignored users","authors":[{"name":"low_kb","id":"1474889588131762206"}],"main":"index.js","vendetta":{"icon":"EyeOffIcon"},"hash":"6bb6dfe609ffd16f9406a1154b34256a288b9388698011bdf4b156f99ba1e4d5"}
+{"name":"DiscordHideBlockUsers","description":"Silently hides messages from blocked and ignored users","authors":[{"name":"low_kb","id":"1474889588131762206"}],"main":"index.js","vendetta":{"icon":"EyeOffIcon"},"hash":"3a94b94920bf0e5b739d3c9e725318fe06fdca34389105295f409678a0a0435d"}

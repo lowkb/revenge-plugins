@@ -31,10 +31,7 @@ const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
             if (!storage.enabled) return;
-
-            // 🔹 debug log
-            logger.log(`[${pluginName} DEBUG] Event type:`, event.type);
-
+            
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 const beforeCount = event.messages.length;
                 event.messages = event.messages.filter(msg => !filterReplies(msg));

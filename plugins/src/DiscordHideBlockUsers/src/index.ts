@@ -6,7 +6,7 @@ import Settings from "./settings";
 
 const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
-const pluginName = "DiscordHideBlockUsers";
+const pluginName = "HideBlockedAndIgnoredMessages";
 
 let blockedCache = new Set<string>();
 let ignoredCache = new Set<string>();
@@ -17,16 +17,18 @@ const updateCache = () => {
 };
 
 const isFilteredUser = (id: string) => {
-    if (!id || !storage.silentFilter) return false;
-    if (blockedCache.has(id) || (storage.silentFilter && isBlocked(id))) return true;
-    if (ignoredCache.has(id) || (storage.silentFilter && isIgnored(id))) return true;
+    if (!id) return false;
+    if (storage.blocked && (blockedCache.has(id) || isBlocked(id))) return true;
+    if (storage.ignored && (ignoredCache.has(id) || isIgnored(id))) return true;
     return false;
 };
 
 const filterMessage = (msg: any) => {
-    if (!msg || !storage.silentFilter) return false;
+    if (!msg) return false;
     if (isFilteredUser(msg.author?.id)) return true;
-    if (msg.referenced_message && isFilteredUser(msg.referenced_message.author?.id)) return true;
+    if (storage.removeReplies && msg.referenced_message) {
+        if (isFilteredUser(msg.referenced_message.author?.id)) return true;
+    }
     return false;
 };
 
@@ -41,7 +43,7 @@ const startPlugin = () => {
                 event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
             }
             if ((event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") && filterMessage(event.message)) {
-                event.channelId = "0"; // ignoruje wiadomość
+                event.channelId = "0";
             }
         })
     );
@@ -49,7 +51,7 @@ const startPlugin = () => {
     patches.push(
         before("generate", RowManager.prototype, ([data]) => {
             if (filterMessage(data.message)) {
-                data.render = () => null; // całkowicie blokuje renderowanie
+                data.render = () => null;
             }
         })
     );
@@ -59,7 +61,9 @@ const startPlugin = () => {
 
 export default {
     onLoad: () => {
-        storage.silentFilter ??= true;
+        storage.blocked ??= true;
+        storage.ignored ??= true;
+        storage.removeReplies ??= true;
         startPlugin();
     },
     onUnload: () => {

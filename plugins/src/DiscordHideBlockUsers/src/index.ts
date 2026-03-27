@@ -57,7 +57,7 @@ const startPlugin = () => {
                 data.message.canShowComponents = false;
                 if (data.rowType === 2) {
                     data.roleStyle = "";
-                    data.text = "[Filtered message]";
+                    data.text = "";
                     data.revealed = false;
                     data.content = [];
                 }

@@ -48,35 +48,30 @@ const startPlugin = () => {
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
-            logger.log(`[Debug] RowType: ${data.rowType}`);
+    if (!data) return;
 
-            // 🔥 usuwa "1 zablokowana wiadomość"
-            if (typeof data.rowType === "string") {
-                if (
-                    data.rowType.includes("blocked") ||
-                    data.rowType.includes("ignored") ||
-                    data.rowType === "blocked_messages"
-                ) {
-                    data.cancel = true;
-                    logger.log(`[Debug] Removed blocked container`);
-                    return;
-                }
-            }
+    // 🔹 usuwa systemowe powiadomienia o zablokowanych wiadomościach
+    if (typeof data.rowType === "string") {
+        if (
+            data.rowType.includes("blocked") ||
+            data.rowType.includes("ignored") ||
+            data.rowType === "blocked_messages"
+        ) {
+            data.cancel = true;
+            logger.log(`[Debug] Removed blocked container row`);
+            return;
+        }
+    }
 
-            if (!data.message) {
-                logger.log(`[Debug] Row without message`);
-                return;
-            }
+    if (!data.message) return;
 
-            const msg = data.message;
+    const msg = data.message;
 
-            logger.log(`[Debug] Row: ${msg.author?.username} | rowType: ${data.rowType}`);
-
-            if (filterMessage(msg)) {
-                data.cancel = true;
-                logger.log(`[Debug] Row removed: ${msg.author?.username}`);
-            }
-        });
+    if (filterMessage(msg)) {
+        data.cancel = true;
+        logger.log(`[Debug] Row removed: ${msg.author?.username}`);
+    }
+});
         patches.push(patch2);
 
         logger.log(`[DiscordHideBlockUsers]: Plugin loaded`);

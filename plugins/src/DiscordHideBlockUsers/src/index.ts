@@ -1,11 +1,12 @@
 import { FluxDispatcher } from "@vendetta/metro/common";
 import { before } from "@vendetta/patcher";
-import { findByProps } from "@vendetta/metro";
+import { findByProps, findByName } from "@vendetta/metro";
 import { logger } from "@vendetta";
 import { storage } from "@vendetta/plugin";
 import Settings from "./settings";
 
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
+const RowManager = findByName("RowManager");
 
 const pluginName = "HideBlockedAndIgnoredMessages";
 let patches: (() => void)[] = [];
@@ -20,7 +21,8 @@ const shouldHide = (msg: any) => {
 
 const startPlugin = () => {
     try {
-        const patch = before("dispatch", FluxDispatcher, ([event]) => {
+        // 🔥 usuwa wiadomości zanim trafią do UI
+        const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 event.messages = event.messages.filter(
                     (msg: any) => !shouldHide(msg)
@@ -37,7 +39,22 @@ const startPlugin = () => {
             }
         });
 
-        patches.push(patch);
+        // 🔥 usuwa placeholder "1 zablokowana wiadomość"
+        const patch2 = before("generate", RowManager.prototype, ([data]) => {
+            if (!storage.enabled) return;
+
+            if (data.rowType === 2) {
+                data.render = () => null;
+                return;
+            }
+
+            if (shouldHide(data.message)) {
+                data.render = () => null;
+            }
+        });
+
+        patches.push(patch1, patch2);
+
         logger.log(`${pluginName} loaded.`);
     } catch (err) {
         logger.error(`[${pluginName}]`, err);

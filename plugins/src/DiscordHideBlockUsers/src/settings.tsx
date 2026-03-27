@@ -1,7 +1,7 @@
 import { React, ReactNative } from "@vendetta/metro/common";
+import { Forms } from "@vendetta/ui/components";
 import { storage } from "@vendetta/plugin";
 import { useProxy } from "@vendetta/storage";
-import { Forms } from "@vendetta/ui/components";
 
 const { View, ScrollView } = ReactNative;
 
@@ -12,33 +12,9 @@ export default function Settings() {
         <ScrollView>
             <View>
                 <Forms.FormSwitchRow
-                    label="Enable hiding"
-                    value={storage.enabled ?? true}
-                    onValueChange={(v: boolean) => (storage.enabled = v)}
-                />
-
-                <Forms.FormSwitchRow
-                    label="Hide blocked users"
-                    value={storage.blocked ?? true}
-                    onValueChange={(v: boolean) => (storage.blocked = v)}
-                />
-
-                <Forms.FormSwitchRow
-                    label="Hide ignored users"
-                    value={storage.ignored ?? true}
-                    onValueChange={(v: boolean) => (storage.ignored = v)}
-                />
-
-                <Forms.FormSwitchRow
-                    label="Hide replies"
-                    value={storage.removeReplies ?? true}
-                    onValueChange={(v: boolean) => (storage.removeReplies = v)}
-                />
-
-                <Forms.FormSwitchRow
-                    label="Debug logs"
-                    value={storage.debug ?? false}
-                    onValueChange={(v: boolean) => (storage.debug = v)}
+                    label="Hide blocked users messages"
+                    value={storage.hideBlocked ?? true}
+                    onValueChange={(v) => (storage.hideBlocked = v)}
                 />
             </View>
         </ScrollView>

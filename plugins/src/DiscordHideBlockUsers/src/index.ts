@@ -28,67 +28,81 @@ const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
-                logger.log(`[DiscordHideBlockUsers][Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length} messages received`);
+                logger.log(`[DiscordHideBlockUsers][Debug] LOAD_MESSAGES_SUCCESS: ${event.messages.length}`);
+
                 event.messages.forEach((msg: any, i: number) => {
                     if (filterMessage(msg)) {
                         msg.filtered = true;
                         msg.content = null;
                         msg.reactions = [];
                         msg.canShowComponents = false;
-                        logger.log(`[DiscordHideBlockUsers][Debug] Message ${i} filtered: ${msg.author?.username}`);
+
+                        logger.log(`[Debug] Filtered (LOAD) ${i}: ${msg.author?.username}`);
                     }
                 });
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                logger.log(`[DiscordHideBlockUsers][Debug] Event type: ${event.type}, from: ${event.message?.author?.username}`);
+                logger.log(`[Debug] ${event.type} from: ${event.message?.author?.username}`);
+
                 if (filterMessage(event.message)) {
                     event.message.filtered = true;
                     event.message.content = null;
                     event.message.reactions = [];
                     event.message.canShowComponents = false;
-                    logger.log(`[DiscordHideBlockUsers][Debug] MESSAGE_CREATE/UPDATE filtered: ${event.message.author?.username}`);
+
+                    logger.log(`[Debug] Filtered (LIVE): ${event.message.author?.username}`);
                 }
             }
         });
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
-            logger.log(`[DiscordHideBlockUsers][Debug] Generating row for message from: ${data.message?.author?.username}, rowType: ${data.rowType}`);
-            if (data.message?.filtered) {
+            if (!data.message) {
+                logger.log(`[Debug] Row without message, rowType: ${data.rowType}`);
+                return;
+            }
+
+            logger.log(`[Debug] Row: ${data.message.author?.username} | rowType: ${data.rowType}`);
+
+            if (data.message.filtered) {
                 data.renderContentOnly = true;
                 data.message.content = null;
                 data.message.reactions = [];
                 data.message.canShowComponents = false;
-                if (data.rowType === 2) {
-                    data.roleStyle = "";
-                    data.revealed = false;
-                    data.content = [];
-                    data.text = "[Filtered message. Check plugin settings.]";
-                }
-                logger.log(`[DiscordHideBlockUsers][Debug] Row filtered for message from: ${data.message?.author?.username}`);
+
+                data.roleStyle = "";
+                data.revealed = false;
+                data.content = [];
+                data.text = "[Filtered message]";
+
+                logger.log(`[Debug] Row filtered: ${data.message.author?.username}`);
             }
         });
         patches.push(patch2);
 
         logger.log(`[DiscordHideBlockUsers]: Plugin loaded`);
     } catch (err) {
-        logger.error(`[DiscordHideBlockUsers]: Error loading plugin`, err);
+        logger.error(`[DiscordHideBlockUsers]: Error`, err);
     }
 };
 
 export default {
     onLoad: () => {
         logger.log(`[DiscordHideBlockUsers]: Plugin loading`);
+
         storage.blocked ??= true;
         storage.ignored ??= true;
+
         startPlugin();
     },
 
     onUnload: () => {
         logger.log(`[DiscordHideBlockUsers]: Plugin unloading`);
+
         patches.forEach(unpatch => unpatch());
         patches = [];
+
         logger.log(`[DiscordHideBlockUsers]: Plugin unloaded`);
     },
 

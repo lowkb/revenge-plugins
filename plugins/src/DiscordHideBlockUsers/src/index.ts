@@ -1,67 +1,82 @@
-import { FluxDispatcher, findByName, findByProps, before, logger } from "@vendetta/metro";
+import { FluxDispatcher } from "@vendetta/metro/common";
+import { before } from "@vendetta/patcher";
+import { findByProps, findByName } from "@vendetta/metro";
+import { logger } from "@vendetta";
 import { storage } from "@vendetta/plugin";
-import Settings from "./settings.tsx";
+import Settings from "./Settings";
 
 const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
-let patches: Function[] = [];
 
-const userFiltered = (id: string) =>
-    id && ((storage.blocked && isBlocked(id)) || (storage.ignored && isIgnored(id)));
+const pluginName = "HideBlockedAndIgnoredMessages";
 
-const msgFiltered = (msg: any) =>
-    msg && (userFiltered(msg.author?.id) || (storage.removeReplies && userFiltered(msg.referenced_message?.author?.id)));
+// Check if a user should be filtered
+const isFilteredUser = (id?: string) => {
+    if (!id) return false;
+    if (storage.blocked && isBlocked(id)) return true;
+    if (storage.ignored && isIgnored(id)) return true;
+    return false;
+};
 
-const makeMessage = (content: string | any, channelId = "0") =>
-    typeof content === "string"
-        ? { id: "", type: 0, content, channel_id: channelId }
-        : { id: "", type: 0, content: "", channel_id: channelId, ...content };
+// Check if a message or its reply should be filtered
+const filterMessage = (msg: any) => {
+    if (!msg) return false;
+    if (isFilteredUser(msg.author?.id)) return true;
+    if (storage.removeReplies && msg.referenced_message) {
+        if (isFilteredUser(msg.referenced_message.author?.id)) return true;
+    }
+    return false;
+};
 
-const initPlugin = () => {
+let patches: any[] = [];
+
+const startPlugin = () => {
     try {
-        patches.push(before("dispatch", FluxDispatcher, ([evt]: any) => {
-            if (evt.type === "LOAD_MESSAGES_SUCCESS") evt.messages = evt.messages.filter((m: any) => !msgFiltered(m));
-            if (["MESSAGE_CREATE", "MESSAGE_UPDATE"].includes(evt.type) && msgFiltered(evt.message)) evt.channelId = "0";
-        }));
-
-        patches.push(before("generate", RowManager.prototype, ([d]: any) => {
-            if (!msgFiltered(d.message)) return;
-            d.renderContentOnly = true;
-            d.message.content = null;
-            d.message.reactions = [];
-            d.message.canShowComponents = false;
-            if (d.rowType === 2) {
-                d.text = "[Filtered message. Check plugin settings.]";
-                d.content = [];
-                d.revealed = false;
-                d.roleStyle = "";
+        // Patch dispatcher to remove blocked/ignored messages
+        const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
+            if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
+                event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
             }
-        }));
 
-        logger.log("Plugin loaded.");
-    } catch (e) {
-        logger.error("Plugin error:", e);
+            if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
+                if (filterMessage(event.message)) {
+                    event.cancel = true;
+                }
+            }
+        });
+        patches.push(patch1);
+
+        // Patch RowManager to prevent rendering filtered messages
+        const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
+            if (filterMessage(data.message)) {
+                data.cancel = true;
+            }
+        });
+        patches.push(patch2);
+
+        logger.log(`${pluginName} loaded.`);
+    } catch (err) {
+        logger.error(`[${pluginName} Error]`, err);
     }
 };
 
 export default {
-    settings: Settings,
+    onLoad: () => {
+        logger.log(`Loading ${pluginName}...`);
 
-    onLoad() {
         storage.blocked ??= true;
         storage.ignored ??= true;
         storage.removeReplies ??= true;
 
-        for (let type of ["MESSAGE_CREATE", "MESSAGE_UPDATE", "LOAD_MESSAGES_SUCCESS"]) {
-            FluxDispatcher.dispatch({ type, message: makeMessage("INIT") });
-        }
-
-        initPlugin();
+        startPlugin();
     },
 
-    onUnload() {
-        patches.forEach(u => u());
+    onUnload: () => {
+        logger.log(`Unloading ${pluginName}...`);
+        for (const unpatch of patches) unpatch();
         patches = [];
-        logger.log("Plugin unloaded.");
-    }
+        logger.log(`${pluginName} unloaded.`);
+    },
+
+    settings: Settings,
 };

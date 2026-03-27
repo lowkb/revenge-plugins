@@ -12,9 +12,20 @@ export default function Settings() {
         <ScrollView>
             <View>
                 <Forms.FormSwitchRow
-                    label="Hide blocked users messages"
-                    value={storage.hideBlocked ?? true}
-                    onValueChange={(v) => (storage.hideBlocked = v)}
+                    label="Remove blocked messages"
+                    value={storage.blocked ?? true}
+                    onValueChange={v => (storage.blocked = v)}
+                />
+                <Forms.FormSwitchRow
+                    label="Remove ignored messages"
+                    value={storage.ignored ?? true}
+                    onValueChange={v => (storage.ignored = v)}
+                />
+                <Forms.FormSwitchRow
+                    label="Remove replies to blocked/ignored users"
+                    value={storage.removeReplies ?? true}
+                    onValueChange={v => (storage.removeReplies = v)}
+                    note="Filters messages replying to blocked or ignored users."
                 />
             </View>
         </ScrollView>

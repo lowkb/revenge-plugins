@@ -7,9 +7,6 @@ import Settings from "./settings";
 
 const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
-
-const pluginName = "HideBlockedAndIgnoredMessages";
-
 // Check if a user should be filtered
 const isFilteredUser = (id?: string) => {
     if (!id) return false;
@@ -34,7 +31,6 @@ let patches: any[] = [];
 
 const startPlugin = () => {
     try {
-        // Patch dispatcher to remove blocked/ignored messages
         const patch1 = before("dispatch", FluxDispatcher, ([event]: any) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
                 event.messages = event.messages.filter((msg: any) => !filterMessage(msg));
@@ -42,29 +38,31 @@ const startPlugin = () => {
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
                 if (filterMessage(event.message)) {
+					logger.log(`[ DiscordHideBlockUsers ]: event ${event.message}`);
                     event.cancel = true;
                 }
             }
         });
         patches.push(patch1);
-
-        // Patch RowManager to prevent rendering filtered messages
+        
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
             if (filterMessage(data.message)) {
+				logger.log(`[ DiscordHideBlockUsers ]: rowManager ${data.message}`);
                 data.cancel = true;
+				
             }
         });
         patches.push(patch2);
 
-        logger.log(`${pluginName} loaded.`);
+        logger.log(`[ DiscordHideBlockUsers ]: Plugin loaded`);
     } catch (err) {
-        logger.error(`[${pluginName} Error]`, err);
+        logger.error(`[ DiscordHideBlockUsers ]: Error:`, err);
     }
 };
 
 export default {
     onLoad: () => {
-        logger.log(`Loading ${pluginName}...`);
+        logger.log(`[ DiscordHideBlockUsers ]: Plugin loading`);
 
         storage.blocked ??= true;
         storage.ignored ??= true;
@@ -73,10 +71,10 @@ export default {
     },
 
     onUnload: () => {
-        logger.log(`Unloading ${pluginName}...`);
+        logger.log(`[ DiscordHideBlockUsers ]: Plugin unloading`);
         for (const unpatch of patches) unpatch();
         patches = [];
-        logger.log(`${pluginName} unloaded.`);
+        logger.log(`[ DiscordHideBlockUsers ]: Plugin unloaded`);
     },
 
     settings: Settings,

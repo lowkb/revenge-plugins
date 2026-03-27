@@ -23,13 +23,7 @@ export default function Settings() {
                     onValueChange={(v) => (storage.ignored = v)}
                     note=""
                 />
-                <Forms.FormSwitchRow
-                    label="Remove replies to blocked/ignored users"
-                    value={storage.removeReplies ?? true}
-                    onValueChange={(v) => (storage.removeReplies = v)}
-                    note="Filters messages replying to blocked or ignored users."
-                />
             </View>
         </ScrollView>
     );
-                }
+                                           }

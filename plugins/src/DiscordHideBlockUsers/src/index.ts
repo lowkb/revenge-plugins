@@ -26,29 +26,46 @@ const filterReplies = (msg: any) => {
     return false;
 };
 
-// --- patch dispatcher ---
+// --- patch dispatcher i RowManager ---
 const startPlugin = () => {
     try {
+        // 🔹 dispatcher – filtruje wiadomości z listy i przychodzące
         const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
             if (!storage.enabled) return;
-            
+
             if (event.type === "LOAD_MESSAGES_SUCCESS" && event.messages) {
                 const beforeCount = event.messages.length;
-                event.messages = event.messages.filter(msg => !filterReplies(msg));
-                const afterCount = event.messages.length;
-                logger.log(`[${pluginName} DEBUG] Filtered messages: ${beforeCount - afterCount}`);
+                event.messages = event.messages.map(msg => {
+                    if (filterReplies(msg)) {
+                        msg.filtered = true; // oznaczamy wiadomość jako ukrytą
+                    }
+                    return msg;
+                });
+                const filteredCount = event.messages.filter(m => m.filtered).length;
+                logger.log(`[${pluginName} DEBUG] Marked messages as filtered: ${filteredCount}/${beforeCount}`);
             }
 
             if ((event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") && event.message) {
                 if (filterReplies(event.message)) {
-                    logger.log(`[${pluginName} DEBUG] Dropping message from: ${event.message.author?.username}`);
-                    event.message = null; // całkowicie usuń wiadomość
+                    logger.log(`[${pluginName} DEBUG] Filtering incoming message from: ${event.message.author?.username}`);
+                    event.message.filtered = true;
                 }
             }
         });
 
-        patches.push(patch1);
+        // 🔹 RowManager – ukrywa treść wiadomości, ale nie zostawia przerwy
+        const patch2 = before("generate", RowManager.prototype, ([data]) => {
+            if (!storage.enabled || !data.message) return;
 
+            if (data.message.filtered) {
+                data.render = () => null; // nic nie renderujemy
+                data.message.content = null;
+                data.message.reactions = [];
+                data.message.canShowComponents = false;
+            }
+        });
+
+        patches.push(patch1, patch2);
         logger.log(`${pluginName} loaded.`);
     } catch (err) {
         logger.error(`[${pluginName} Error]`, err);
@@ -59,7 +76,6 @@ export default {
     onLoad: () => {
         logger.log(`Loading ${pluginName}...`);
 
-        // ustawienia domyślne
         storage.enabled ??= true;
         storage.blocked ??= true;
         storage.ignored ??= true;

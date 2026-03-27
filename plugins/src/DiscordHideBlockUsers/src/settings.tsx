@@ -30,9 +30,15 @@ export default function Settings() {
                 />
 
                 <Forms.FormSwitchRow
-                    label="Hide replies to blocked/ignored"
+                    label="Hide replies"
                     value={storage.removeReplies ?? true}
                     onValueChange={(v: boolean) => (storage.removeReplies = v)}
+                />
+
+                <Forms.FormSwitchRow
+                    label="Debug logs"
+                    value={storage.debug ?? false}
+                    onValueChange={(v: boolean) => (storage.debug = v)}
                 />
             </View>
         </ScrollView>

@@ -1,7 +1,7 @@
 
 import { FluxDispatcher, findByName, findByProps, before, logger } from "@vendetta/metro";
 import { storage } from "@vendetta/plugin";
-import Settings from "./Settings";
+import Settings from "./settings";
 
 const { isBlocked } = findByProps("isBlocked");
 const RowManager = findByName("RowManager");

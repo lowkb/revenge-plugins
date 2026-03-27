@@ -26,24 +26,23 @@ let patches: (() => void)[] = [];
 
 const startPlugin = () => {
     try {
-                const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
+        const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
             if (event.type === "LOAD_MESSAGES_SUCCESS") {
                 event.messages = event.messages.filter(
-                    (msg) => !filterReplies(msg)
+                    (msg) => !filterMessage(msg)
                 );
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
-                if (filterReplies(event.message)) {
+                if (filterMessage(event.message)) {
                     event.channelId = "0";
                 }
             }
         });
         patches.push(patch1);
 
-        // Patch render
         const patch2 = before("generate", RowManager.prototype, ([data]) => {
-            if (filterReplies(data.message)) {
+            if (filterMessage(data.message)) {
                 data.renderContentOnly = true;
                 data.message.content = null;
                 data.message.reactions = [];
@@ -56,6 +55,7 @@ const startPlugin = () => {
             }
         });
         patches.push(patch2);
+
         logger.log(`[DiscordHideBlockUsers]: Plugin loaded`);
     } catch (err) {
         logger.error(`[DiscordHideBlockUsers]: Error loading plugin`, err);

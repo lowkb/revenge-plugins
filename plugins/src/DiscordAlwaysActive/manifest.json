@@ -1,6 +1,6 @@
 {
-  "name": "AlwaysActive",
-  "description": "Keeps your Discord account active 24/7 by preventing idle status",
+  "name": "DiscordAlwaysActive",
+  "description": "Keeps your Discord account active 24/7",
   "authors": [
     {
       "name": "low_kb",

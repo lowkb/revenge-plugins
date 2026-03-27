@@ -3,13 +3,14 @@ import { before } from "@vendetta/patcher";
 import { findByProps, findByName } from "@vendetta/metro";
 import { logger } from "@vendetta";
 import { storage } from "@vendetta/plugin";
-import Settings from "./settings";
+import Settings from "./Settings";
 
 const RowManager = findByName("RowManager");
 const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 
 const pluginName = "HideBlockedAndIgnoredMessages";
 
+// Check if a user should be filtered
 const isFilteredUser = (id?: string) => {
     if (!id) return false;
     if (storage.blocked && isBlocked(id)) return true;
@@ -20,8 +21,10 @@ const isFilteredUser = (id?: string) => {
 // Check if a message or its reply should be filtered
 const filterMessage = (msg: any) => {
     if (!msg) return false;
+    // Filter message if author is blocked/ignored
     if (isFilteredUser(msg.author?.id)) return true;
-    if (storage.removeReplies && msg.referenced_message) {
+    // Always filter replies to blocked/ignored users
+    if (msg.referenced_message) {
         if (isFilteredUser(msg.referenced_message.author?.id)) return true;
     }
     return false;
@@ -65,7 +68,6 @@ export default {
 
         storage.blocked ??= true;
         storage.ignored ??= true;
-        storage.removeReplies ??= true;
 
         startPlugin();
     },

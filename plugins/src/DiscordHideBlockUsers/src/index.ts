@@ -10,7 +10,6 @@ const { isBlocked, isIgnored } = findByProps("isBlocked", "isIgnored");
 
 const pluginName = "HideBlockedAndIgnoredMessages";
 
-// Check if a user should be filtered
 const isFilteredUser = (id?: string) => {
     if (!id) return false;
     if (storage.blocked && isBlocked(id)) return true;

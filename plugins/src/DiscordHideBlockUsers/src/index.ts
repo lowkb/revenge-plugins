@@ -48,8 +48,23 @@ const startPlugin = () => {
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]: any) => {
+            logger.log(`[Debug] RowType: ${data.rowType}`);
+
+            // 🔥 usuwa "1 zablokowana wiadomość"
+            if (typeof data.rowType === "string") {
+                if (
+                    data.rowType.includes("blocked") ||
+                    data.rowType.includes("ignored") ||
+                    data.rowType === "blocked_messages"
+                ) {
+                    data.cancel = true;
+                    logger.log(`[Debug] Removed blocked container`);
+                    return;
+                }
+            }
+
             if (!data.message) {
-                logger.log(`[Debug] Row without message, rowType: ${data.rowType}`);
+                logger.log(`[Debug] Row without message`);
                 return;
             }
 

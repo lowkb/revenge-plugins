@@ -27,21 +27,22 @@ let patches: (() => void)[] = [];
 const startPlugin = () => {
     try {
         const patch1 = before("dispatch", FluxDispatcher, ([event]) => {
-            if (event.type === "LOAD_MESSAGES_SUCCESS") {
-                event.messages = event.messages.filter(
-                    (msg) => !filterMessage(msg)
-                );
+            if (!event) return;
+
+            if (event.type === "LOAD_MESSAGES_SUCCESS" && Array.isArray(event.messages)) {
+                event.messages = event.messages.filter(msg => !filterMessage(msg));
             }
 
             if (event.type === "MESSAGE_CREATE" || event.type === "MESSAGE_UPDATE") {
                 if (filterMessage(event.message)) {
-                    event.channelId = "0";
+                    event.channelId = "0"; // "przekierowanie" na niewidoczny kanał
                 }
             }
         });
         patches.push(patch1);
 
         const patch2 = before("generate", RowManager.prototype, ([data]) => {
+            if (!data?.message) return;
             if (filterMessage(data.message)) {
                 data.renderContentOnly = true;
                 data.message.content = null;
@@ -56,25 +57,25 @@ const startPlugin = () => {
         });
         patches.push(patch2);
 
-        logger.log(`[DiscordHideBlockUsers]: Plugin loaded`);
+        logger.log("[DiscordHideBlockUsers]: Plugin loaded");
     } catch (err) {
-        logger.error(`[DiscordHideBlockUsers]: Error loading plugin`, err);
+        logger.error("[DiscordHideBlockUsers]: Error loading plugin", err);
     }
 };
 
 export default {
     onLoad: () => {
-        logger.log(`[DiscordHideBlockUsers]: Plugin loading`);
+        logger.log("[DiscordHideBlockUsers]: Plugin loading");
         storage.blocked ??= true;
         storage.ignored ??= true;
         startPlugin();
     },
 
     onUnload: () => {
-        logger.log(`[DiscordHideBlockUsers]: Plugin unloading`);
+        logger.log("[DiscordHideBlockUsers]: Plugin unloading");
         patches.forEach(unpatch => unpatch());
         patches = [];
-        logger.log(`[DiscordHideBlockUsers]: Plugin unloaded`);
+        logger.log("[DiscordHideBlockUsers]: Plugin unloaded");
     },
 
     settings: Settings,

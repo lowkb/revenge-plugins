@@ -1,21 +1,28 @@
 import { logger } from "@vendetta";
-import { patchUserProfileContent } from "./patch/UserProfileContent";
+import ViewComponent from "./patches/ViewComponent";
 
-let unpatches: (() => void)[] = [];
+let unpatch = null;
+const patches = [
+        [ViewComponent, []]
+];
+const patcher = () => patches.forEach(([fn, args]) => fn(...args));
 
 export default {
-    onLoad: () => {
-        logger.log("[RPC] Plugin loading...");
+        onLoad: async () => {
 
-        unpatches.push(...patchUserProfileContent());
+                
+                try {
+                        unpatch = patcher();
+                }
+                catch(err) {
+                        logger.info(`${pluginNameToast} Crash On Load.\n\n`, err)
+                        showToast(`${pluginNameToast} Crashing On Load. Please check debug log for more info.`)
+                        stopPlugin(id)                
+                }
+        },
+        onUnload: () => {
 
-        logger.log("[RPC] Plugin loaded successfully");
-    },
-
-    onUnload: () => {
-        logger.log("[RPC] Unloading plugin...");
-        unpatches.forEach(u => u());
-        unpatches = [];
-        logger.log("[RPC] Plugin unloaded");
+        unpatch?.()
+        // stopPlugin(id)
     }
-};
+}

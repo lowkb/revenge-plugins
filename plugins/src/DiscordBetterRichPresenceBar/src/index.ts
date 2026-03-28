@@ -1,20 +1,14 @@
-import { patcher } from "@vendetta";
+import { patcher, logger } from "@vendetta";
 import { findByTypeName, findByStoreName } from "@vendetta/metro";
 import { storage } from "@vendetta/plugin";
 import UserRichPresence from "./UserRichPresence";
-import Settings from "./settings";
-import { React, logger } from "@vendetta/metro/common";
+import { React } from "@vendetta/metro/common";
 
 let unpatches: (() => void)[] = [];
 
 export default {
     onLoad: () => {
         logger.log("[RPC] Plugin loading...");
-
-        storage.showRPCButtons ??= true;
-        logger.log("[RPC] showRPCButtons =", storage.showRPCButtons);
-
-        if (!storage.showRPCButtons) return;
 
         const UserProfileContent = findByTypeName("UserProfileContent");
         const UserStore = findByStoreName("UserStore");

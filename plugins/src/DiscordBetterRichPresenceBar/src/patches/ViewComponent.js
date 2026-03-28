@@ -12,15 +12,15 @@ export default () => before("render", General.View, (args) => {
     const userProps = userChild?.props;
     const presenceProps = presenceChild?.props;
 
-    // logujemy tylko serializowalne dane
     if (userProps?.user) {
         logger.log("User ID:", userProps.user.id);
         logger.log("Username:", userProps.user.username);
     }
 
-    if (presenceProps) {
-        // przykładowo logujemy tylko pola które są proste
-        logger.log("Presence status:", presenceProps.status);
-        logger.log("Presence activities:", presenceProps.activities?.map(a => a.name));
-    }
+    // bezpieczny fallback dla statusu i aktywności
+    const status = presenceProps?.status ?? "no status";
+    const activities = presenceProps?.activities?.map(a => a.name) ?? [];
+
+    logger.log("Presence status:", status);
+    logger.log("Presence activities:", activities.length ? activities : ["no activities"]);
 });

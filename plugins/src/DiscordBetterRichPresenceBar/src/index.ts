@@ -5,6 +5,7 @@ import UserRichPresence from "./UserRichPresence";
 import { React } from "@vendetta/metro/common";
 
 let unpatches: (() => void)[] = [];
+const patchedMap = new WeakMap<any, boolean>();
 
 export default {
     onLoad: () => {
@@ -23,14 +24,16 @@ export default {
                     return res;
                 }
 
-                logger.log("[RPC] Rendering profile for user id:", user.id);
-
                 if (user.id !== me.id) {
                     logger.log("[RPC] Not current user, skipping RPC buttons");
                     return res;
                 }
 
-                const primaryInfo = res.props.children.find(
+                const children = Array.isArray(res.props.children)
+                    ? res.props.children
+                    : [res.props.children];
+
+                const primaryInfo = children.find(
                     (c: any) => c?.type?.name === "PrimaryInfo"
                 );
 
@@ -39,20 +42,25 @@ export default {
                     return res;
                 }
 
-                if (primaryInfo._rpcButtonsPatched) {
+                if (patchedMap.has(primaryInfo)) {
                     logger.log("[RPC] RPC buttons already patched");
                     return res;
                 }
 
-                primaryInfo._rpcButtonsPatched = true;
+                patchedMap.set(primaryInfo, true);
                 logger.log("[RPC] Adding RPC buttons to profile");
 
-                primaryInfo.props.children.push(
+                const existingChildren = Array.isArray(primaryInfo.props.children)
+                    ? primaryInfo.props.children
+                    : [primaryInfo.props.children];
+
+                primaryInfo.props.children = [
+                    ...existingChildren,
                     React.createElement(UserRichPresence, {
                         onRPC1: () => logger.log("[RPC] RPC 1 clicked"),
-                        onRPC2: () => logger.log("[RPC] RPC 2 clicked")
+                        onRPC2: () => logger.log("[RPC] RPC 2 clicked"),
                     })
-                );
+                ];
 
                 return res;
             })
@@ -60,9 +68,11 @@ export default {
 
         logger.log("[RPC] Plugin loaded successfully");
     },
+
     onUnload: () => {
         logger.log("[RPC] Unloading plugin...");
         unpatches.forEach(u => u());
+        unpatches = [];
         logger.log("[RPC] Plugin unloaded");
     }
 };

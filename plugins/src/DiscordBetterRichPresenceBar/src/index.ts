@@ -64,6 +64,5 @@ export default {
         logger.log("[RPC] Unloading plugin...");
         unpatches.forEach(u => u());
         logger.log("[RPC] Plugin unloaded");
-    },
-    settings: Settings
+    }
 };

@@ -9,14 +9,18 @@ export default () => before("render", General.View, (args) => {
     const userChild = props.children[1];
     const presenceChild = props.children[3];
 
-    logger.log("userChild.props:", userChild?.props);
-    logger.log("presenceChild.props:", presenceChild?.props);
-
     const userProps = userChild?.props;
     const presenceProps = presenceChild?.props;
 
+    // logujemy tylko serializowalne dane
     if (userProps?.user) {
-        logger.log("User ID:", userProps.user?.id);
-        logger.log("Presence props:", presenceProps);
+        logger.log("User ID:", userProps.user.id);
+        logger.log("Username:", userProps.user.username);
+    }
+
+    if (presenceProps) {
+        // przykładowo logujemy tylko pola które są proste
+        logger.log("Presence status:", presenceProps.status);
+        logger.log("Presence activities:", presenceProps.activities?.map(a => a.name));
     }
 });

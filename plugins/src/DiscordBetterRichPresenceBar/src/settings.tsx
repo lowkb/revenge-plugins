@@ -1,40 +1,41 @@
-import { React } from "@vendetta/metro/common";
+import { React, ReactNative } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
-import { findByProps } from "@vendetta/metro";
+import { useProxy } from "@vendetta/storage";
+import { Forms } from "@vendetta/ui/components";
 
-const { FormSwitch, FormSection } = findByProps(
-        "FormSwitch",
-        "FormSection",
-);
+const { View, ScrollView } = ReactNative;
+
+const settingsConfig = [
+    {
+        key: "enabled",
+        label: "Enable Better Rich Presence",
+        default: true,
+        note: "Toggle the custom rich presence feature",
+    },
+    {
+        key: "showJoin",
+        label: "Show Join Button",
+        default: true,
+        note: "Display the 'Join' button for user activities",
+    },
+];
 
 export default function Settings() {
-        const [enabled, setEnabled] = React.useState(
-                storage.enabled ?? true,
-        );
+    useProxy(storage);
 
-        const [showJoin, setShowJoin] = React.useState(
-                storage.showJoin ?? true,
-        );
-
-        return (
-                <FormSection title="Better Rich Presence">
-                        <FormSwitch
-                                label="Enable plugin"
-                                value={enabled}
-                                onValueChange={(v: boolean) => {
-                                        setEnabled(v);
-                                        storage.enabled = v;
-                                }}
-                        />
-
-                        <FormSwitch
-                                label="Show Join button"
-                                value={showJoin}
-                                onValueChange={(v: boolean) => {
-                                        setShowJoin(v);
-                                        storage.showJoin = v;
-                                }}
-                        />
-                </FormSection>
-        );
-}
+    return (
+        <ScrollView>
+            <View style={{ padding: 10 }}>
+                {settingsConfig.map(({ key, label, default: def, note }) => (
+                    <Forms.FormSwitchRow
+                        key={key}
+                        label={label}
+                        value={storage[key] ?? def}
+                        onValueChange={(v) => (storage[key] = v)}
+                        note={note || ""}
+                    />
+                ))}
+            </View>
+        </ScrollView>
+    );
+                                    }

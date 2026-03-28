@@ -1,26 +1,30 @@
 import { before } from "@vendetta/patcher";
-import { logger } from "@vendetta";
-import { General } from "@vendetta/ui/components";
+import { findByName } from "@vendetta/metro";
+import { React } from "@vendetta/metro/common";
 
-export default () => before("render", General.View, (args) => {
-    const [props] = args;
-    if (!props || !props.children) return;
+export default () => {
+    const UserProfileCard = findByName("UserProfileCard");
+    if (!UserProfileCard) return;
 
-    const userChild = props.children[1];
-    const presenceChild = props.children[3];
+    return before("render", UserProfileCard, (args, res) => {
+        const original = res;
 
-    const userProps = userChild?.props;
-    const presenceProps = presenceChild?.props;
+        // wyciągamy istniejące RPC (game/aktivność)
+        const rpcWrapper = original?.props?.children?.[1]; 
 
-    if (!userProps?.user) return; // ignorujemy wrappery bez użytkownika
+        if (!rpcWrapper) return res;
 
-    const userId = userProps.user.id;
-    const username = userProps.user.username;
+        // tworzymy własne przyciski
+        const buttons = (
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+                <button onClick={() => console.log("Button 1 clicked")}>Action 1</button>
+                <button onClick={() => console.log("Button 2 clicked")}>Action 2</button>
+            </div>
+        );
 
-    const status = presenceProps?.status;
-    const activities = presenceProps?.activities?.map(a => a.name);
+        // dodajemy buttons pod RPC
+        rpcWrapper.props.children.push(buttons);
 
-    logger.log(`[User ${username} | ID: ${userId}]`);
-    if (status) logger.log("Presence status:", status);
-    if (activities?.length) logger.log("Presence activities:", activities);
-});
+        return res;
+    });
+};

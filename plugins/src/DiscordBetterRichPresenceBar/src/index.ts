@@ -1,13 +1,14 @@
 import { logger } from "@vendetta";
-import { before, unpatchAll } from "@vendetta/patcher";
-import { findByName, findByStoreName } from "@vendetta/metro";
+import { patcher } from "@vendetta/patcher";
+import { findByName, findByTypeName, findByStoreName } from "@vendetta/metro";
+import { findInReactTree } from "@vendetta/utils";
 import { React } from "@vendetta/metro/common";
 import { storage } from "@vendetta/plugin";
 import Settings from "./settings";
 
 const PresenceStore = findByStoreName("PresenceStore");
 
-let patches: Array<() => void> = [];
+let unpatches: Array<() => void> = [];
 
 function ViewContainer(props: { children: any }) {
         const { ReactNative: RN } = require("@vendetta/metro/common");
@@ -88,32 +89,85 @@ function CustomPresence(props: { userId: string }) {
         );
 }
 
-function patchPresence() {
-        const Activity = findByName("Activity");
+function patchUserProfile() {
+        const UserProfileContent = findByTypeName("UserProfileContent");
+        if (!UserProfileContent) return;
 
-        if (!Activity) {
-                logger.warn("Activity component not found");
-                return;
-        }
+        unpatches.push(
+                patcher.after("type", UserProfileContent, (_, res) => {
+                        const userId = findInReactTree(
+                                res,
+                                (m) => m?.props?.user?.id,
+                        )?.props?.user?.id;
 
-        const patch = before("default", Activity, (args) => {
-                const props = args[0];
+                        if (!userId) return;
 
-                if (!props?.user?.id) return;
+                        const primary = findInReactTree(
+                                res,
+                                (c) => c?.type?.name === "UserProfilePrimaryInfo",
+                        );
 
-                const original = props.children;
+                        if (!primary) return;
 
-                props.children = React.createElement(
-                        React.Fragment,
-                        null,
-                        original,
-                        React.createElement(CustomPresence, {
-                                userId: props.user.id,
-                        }),
-                );
-        });
+                        patcher.after("type", primary, (_, res2) => {
+                                if (!res2?.props?.children) return;
 
-        patches.push(patch);
+                                if (
+                                        findInReactTree(
+                                                res2,
+                                                (c) => c?.key === "BetterRPC",
+                                        )
+                                )
+                                        return;
+
+                                res2.props.children.push(
+                                        React.createElement(CustomPresence, {
+                                                key: "BetterRPC",
+                                                userId,
+                                        }),
+                                );
+                        });
+                }),
+        );
+}
+
+function patchDMHeader() {
+        const ChannelHeader = findByName("ChannelHeader", false);
+        if (!ChannelHeader) return;
+
+        unpatches.push(
+                patcher.after("default", ChannelHeader, (_, res) => {
+                        if (!(res?.type?.type?.name === "PrivateChannelHeader"))
+                                return;
+
+                        patcher.after("type", res.type, (_, res2) => {
+                                const userId = findInReactTree(
+                                        res2,
+                                        (m) => m?.props?.user?.id,
+                                )?.props?.user?.id;
+
+                                if (!userId) return;
+
+                                if (
+                                        findInReactTree(
+                                                res2,
+                                                (c) => c?.key === "BetterRPC",
+                                        )
+                                )
+                                        return;
+
+                                const container = res2?.props?.children;
+                                if (!container?.props?.children) return;
+
+                                container.props.children.push(
+                                        React.createElement(CustomPresence, {
+                                                key: "BetterRPC",
+                                                userId,
+                                        }),
+                                );
+                        });
+                }),
+        );
 }
 
 export default {
@@ -123,12 +177,13 @@ export default {
                 if (storage.enabled === undefined) storage.enabled = true;
                 if (storage.showJoin === undefined) storage.showJoin = true;
 
-                patchPresence();
+                patchUserProfile();
+                patchDMHeader();
         },
 
         onUnload() {
-                unpatchAll();
-                patches = [];
+                unpatches.forEach((u) => u());
+                unpatches = [];
                 logger.log("BetterRichPresence unloaded");
         },
 

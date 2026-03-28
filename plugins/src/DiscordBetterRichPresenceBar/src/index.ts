@@ -29,23 +29,18 @@ export default {
 
         unpatches.push(
             patcher.after("getUserProfile", UserProfileStore, (args, res) => {
+                const userArg = args[0];
+                const userId = typeof userArg === "string" ? userArg : userArg?.id;
                 logger.log("[RPC] getUserProfile called with args:", args);
+                logger.log("[RPC] Rendering profile for userId:", userId);
 
-                if (!res) {
-                    logger.log("[RPC] getUserProfile returned null/undefined, skipping");
+                if (!userId) {
+                    logger.log("[RPC] No userId found, skipping patch");
                     return res;
                 }
 
-                const user = args[0];
-                logger.log("[RPC] Rendering profile for user:", user?.id);
-
-                if (!user) {
-                    logger.log("[RPC] User argument is missing, skipping patch");
-                    return res;
-                }
-
-                if (user.id !== me.id) {
-                    logger.log("[RPC] Not current user (user.id !== me.id), skipping RPC buttons");
+                if (userId !== me.id) {
+                    logger.log("[RPC] Not current user (userId !== me.id), skipping RPC buttons");
                     return res;
                 }
 
@@ -84,7 +79,7 @@ export default {
                     })
                 ];
 
-                logger.log("[RPC] RPC buttons added successfully");
+                logger.log("[RPC] RPC buttons added successfully for current user");
 
                 return res;
             })

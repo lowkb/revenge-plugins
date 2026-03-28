@@ -1,84 +1,61 @@
 import { patcher } from "@vendetta";
-import { findByProps, findByStoreName, findByTypeName } from "@vendetta/metro";
+import { findByTypeName, findByStoreName } from "@vendetta/metro";
 import { storage } from "@vendetta/plugin";
 import React from "react";
-import Settings from "./settings";
-import StatusIcons from "./StatusIcons";
-import { findInReactTree } from "@vendetta/utils";
 import { General } from "@vendetta/ui/components";
-
-const { View } = General;
+import Settings from "./settings";
+const { View, Button } = General;
 
 let unpatches: (() => void)[] = [];
 
 export default {
-  onLoad: () => {
-    storage.profileRichPresence ??= true;
-    storage.profileUsername ??= true;
+    onLoad: () => {
+        storage.showRPCButtons ??= true;
 
-    const PresenceStore = findByStoreName("PresenceStore");
-    const UserProfileContent = findByTypeName("UserProfileContent");
+        if (!storage.showRPCButtons) return;
 
-    if (UserProfileContent) {
-      unpatches.push(
-        patcher.after("type", UserProfileContent, (_, res) => {
-          if (!storage.profileRichPresence) return;
+        const UserProfileContent = findByTypeName("UserProfileContent");
+        const UserStore = findByStoreName("UserStore");
+        const me = UserStore.getCurrentUser();
 
-          const primaryInfo = findInReactTree(res, (c) => c?.type?.name === "PrimaryInfo");
-          if (!primaryInfo) return;
+        unpatches.push(
+            patcher.after("type", UserProfileContent, (args, res) => {
+                const user = args[0]?.user;
+                if (!user || user.id !== me.id) return res;
 
-          patcher.after("type", primaryInfo, (_, resPrimary) => {
-            if (!resPrimary?.type?.name.includes("UserProfilePrimaryInfo")) return;
+                const primaryInfo = res.props.children.find(
+                    (c: any) => c?.type?.name === "PrimaryInfo"
+                );
+                if (!primaryInfo || primaryInfo._rpcButtonsPatched) return res;
 
-            const richPresenceComp = findInReactTree(resPrimary, (c) => c?.type?.name === "UserProfileRichPresence");
-            const displayNameComp = findInReactTree(resPrimary, (c) => c?.type?.name === "DisplayName");
+                primaryInfo._rpcButtonsPatched = true;
 
-            let userId = null;
-            if (displayNameComp?.props?.user?.id) userId = displayNameComp.props.user.id;
-
-            if (!userId) return;
-
-            if (richPresenceComp) {
-              // Patch rich presence buttons and container
-              patcher.after("type", richPresenceComp.type, (_, resRich) => {
-                const buttonsContainer = findInReactTree(resRich, (c) => c?.props?.buttons);
-                if (buttonsContainer) {
-                  // Ensure all buttons are rendered (pass original props)
-                  resRich.props.buttons = richPresenceComp.props.buttons;
-                }
-
-                // Add your StatusIcons next to rich presence
-                if (!findInReactTree(resRich, (c) => c.key === "UserProfileStatusIcons")) {
-                  resRich.props.children = (
-                    <View style={{ flexDirection: "row" }}>
-                      {resRich.props.children}
-                      <View key="UserProfileStatusIcons">
-                        <StatusIcons userId={userId} />
-                      </View>
+                primaryInfo.props.children.push(
+                    <View
+                        key="RPCButtons"
+                        style={{
+                            flexDirection: "row",
+                            justifyContent: "flex-start",
+                            marginTop: 8
+                        }}
+                    >
+                        <Button
+                            label="RPC 1"
+                            onPress={() => createRPC("action1")}
+                        />
+                        <Button
+                            label="RPC 2"
+                            onPress={() => createRPC("action2")}
+                        />
                     </View>
-                  );
-                }
+                );
 
-                return resRich;
-              });
-            } else if (displayNameComp && !findInReactTree(displayNameComp, (c) => c.key === "UserProfileStatusIcons")) {
-              // Fallback if rich presence component doesn't exist yet
-              displayNameComp.props.children.push(
-                <View key="UserProfileStatusIcons">
-                  <StatusIcons userId={userId} />
-                </View>
-              );
-            }
-          });
-        })
-      );
-    }
-  },
-
-  onUnload: () => {
-    unpatches.forEach((u) => u());
-    unpatches = [];
-  },
-
-  settings: () => <Settings />,
+                return res;
+            })
+        );
+    },
+    onUnload: () => {
+        unpatches.forEach(u => u());
+    },
+    settings: Settings
 };

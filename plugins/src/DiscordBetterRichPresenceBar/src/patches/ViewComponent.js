@@ -9,8 +9,8 @@ export default () => before("render", General.View, (args) => {
     const userChild = props.children[1];
     const presenceChild = props.children[3];
 
-    logger.log("userChild:", userChild);
-    logger.log("presenceChild:", presenceChild);
+    logger.log("userChild.props:", userChild?.props);
+    logger.log("presenceChild.props:", presenceChild?.props);
 
     const userProps = userChild?.props;
     const presenceProps = presenceChild?.props;

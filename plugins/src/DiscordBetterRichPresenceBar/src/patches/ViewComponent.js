@@ -1,15 +1,16 @@
 import { before } from "@vendetta/patcher";
-import { General } from "@vendetta/ui/components";
 import { logger } from "@vendetta";
+import { General } from "@vendetta/ui/components";
 
 export default () => before("render", General.View, (args) => {
-
-    logger.log("rpcview ok");
-const [props] = args;
+    const [props] = args;
     if (!props || !props.children) return;
-    
+
     const userChild = props.children[1];
     const presenceChild = props.children[3];
+
+    logger.log("userChild:", userChild);
+    logger.log("presenceChild:", presenceChild);
 
     const userProps = userChild?.props;
     const presenceProps = presenceChild?.props;

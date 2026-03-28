@@ -12,15 +12,15 @@ export default () => before("render", General.View, (args) => {
     const userProps = userChild?.props;
     const presenceProps = presenceChild?.props;
 
-    if (userProps?.user) {
-        logger.log("User ID:", userProps.user.id);
-        logger.log("Username:", userProps.user.username);
-    }
+    if (!userProps?.user) return; // ignorujemy wrappery bez użytkownika
 
-    // bezpieczny fallback dla statusu i aktywności
-    const status = presenceProps?.status ?? "no status";
-    const activities = presenceProps?.activities?.map(a => a.name) ?? [];
+    const userId = userProps.user.id;
+    const username = userProps.user.username;
 
-    logger.log("Presence status:", status);
-    logger.log("Presence activities:", activities.length ? activities : ["no activities"]);
+    const status = presenceProps?.status;
+    const activities = presenceProps?.activities?.map(a => a.name);
+
+    logger.log(`[User ${username} | ID: ${userId}]`);
+    if (status) logger.log("Presence status:", status);
+    if (activities?.length) logger.log("Presence activities:", activities);
 });

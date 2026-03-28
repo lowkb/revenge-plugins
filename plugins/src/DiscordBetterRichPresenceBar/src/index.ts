@@ -2,19 +2,63 @@ import { logger } from "@vendetta";
 import { before, unpatchAll } from "@vendetta/patcher";
 import { findByName, findByStoreName } from "@vendetta/metro";
 import { React } from "@vendetta/metro/common";
+import { storage } from "@vendetta/plugin";
 import Settings from "./settings";
 
 const PresenceStore = findByStoreName("PresenceStore");
 
 let patches: Array<() => void> = [];
 
-function CustomPresence({ userId }: { userId: string }) {
+function ViewContainer(props: { children: any }) {
+        const { ReactNative: RN } = require("@vendetta/metro/common");
+
+        return React.createElement(
+                RN.View,
+                {
+                        style: {
+                                padding: 10,
+                                flexDirection: "row",
+                                gap: 8,
+                        },
+                },
+                props.children,
+        );
+}
+
+function ActionButton(props: {
+        label: string;
+        onPress: () => void;
+}) {
+        const { ReactNative: RN } = require("@vendetta/metro/common");
+
+        return React.createElement(
+                RN.TouchableOpacity,
+                {
+                        onPress: props.onPress,
+                        style: {
+                                paddingHorizontal: 12,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                backgroundColor: "#5865F2",
+                        },
+                },
+                React.createElement(
+                        RN.Text,
+                        {
+                                style: { color: "white", fontWeight: "600" },
+                        },
+                        props.label,
+                ),
+        );
+}
+
+function CustomPresence(props: { userId: string }) {
         const [activity, setActivity] = React.useState<any>(null);
 
         React.useEffect(() => {
                 const update = () => {
                         try {
-                                const presence = PresenceStore.getPresence(userId);
+                                const presence = PresenceStore.getPresence(props.userId);
                                 setActivity(presence?.activities?.[0] ?? null);
                         } catch (e) {
                                 logger.error("CustomPresence", e);
@@ -24,63 +68,23 @@ function CustomPresence({ userId }: { userId: string }) {
                 update();
                 const sub = PresenceStore.addChangeListener(update);
                 return () => sub.remove();
-        }, [userId]);
+        }, [props.userId]);
 
-        if (!activity) return null;
+        if (!activity || storage.enabled === false) return null;
 
-        return (
-                <ViewContainer>
-                        <ActionButton
-                                label="Open"
-                                onPress={() => logger.log("Open clicked")}
-                        />
-                        <ActionButton
-                                label="Join"
-                                onPress={() => logger.log("Join clicked")}
-                        />
-                </ViewContainer>
-        );
-}
-
-function ViewContainer({ children }: { children: React.ReactNode }) {
-        const { ReactNative: RN } = require("@vendetta/metro/common");
-
-        return (
-                <RN.View
-                        style={{
-                                padding: 10,
-                                flexDirection: "row",
-                                gap: 8,
-                        }}
-                >
-                        {children}
-                </RN.View>
-        );
-}
-
-function ActionButton({
-        label,
-        onPress,
-}: {
-        label: string;
-        onPress: () => void;
-}) {
-        const { ReactNative: RN } = require("@vendetta/metro/common");
-
-        return (
-                <RN.TouchableOpacity
-                        onPress={onPress}
-                        style={{
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                backgroundColor: "#5865F2",
-                        }}
-                >
-                        <RN.Text style={{ color: "white", fontWeight: "600" }}>
-                                {label}
-                        </RN.Text>
-                </RN.TouchableOpacity>
+        return React.createElement(
+                ViewContainer,
+                null,
+                React.createElement(ActionButton, {
+                        label: "Open",
+                        onPress: () => logger.log("Open clicked"),
+                }),
+                storage.showJoin !== false
+                        ? React.createElement(ActionButton, {
+                                  label: "Join",
+                                  onPress: () => logger.log("Join clicked"),
+                          })
+                        : null,
         );
 }
 
@@ -99,11 +103,13 @@ function patchPresence() {
 
                 const original = props.children;
 
-                props.children = (
-                        <>
-                                {original}
-                                <CustomPresence userId={props.user.id} />
-                        </>
+                props.children = React.createElement(
+                        React.Fragment,
+                        null,
+                        original,
+                        React.createElement(CustomPresence, {
+                                userId: props.user.id,
+                        }),
                 );
         });
 
@@ -112,14 +118,18 @@ function patchPresence() {
 
 export default {
         onLoad() {
-                logger.log("Custom RPC UI loaded");
+                logger.log("BetterRichPresence loaded");
+
+                if (storage.enabled === undefined) storage.enabled = true;
+                if (storage.showJoin === undefined) storage.showJoin = true;
+
                 patchPresence();
         },
 
         onUnload() {
                 unpatchAll();
                 patches = [];
-                logger.log("Custom RPC UI unloaded");
+                logger.log("BetterRichPresence unloaded");
         },
 
         settings: Settings,

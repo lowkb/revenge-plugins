@@ -33,6 +33,11 @@ export default {
                     ? res.props.children
                     : [res.props.children];
 
+                logger.log("[RPC] childrens: " + children);
+                    
+
+                
+
                 const primaryInfo = children.find(
                     (c: any) => c?.type?.name === "PrimaryInfo"
                 );

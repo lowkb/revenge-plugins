@@ -16,18 +16,14 @@ export default function Settings() {
                 storage.showJoin ?? true,
         );
 
-        const toggle = (key: string, value: boolean) => {
-                storage[key] = value;
-        };
-
         return (
-                <FormSection title="Custom Rich Presence">
+                <FormSection title="Better Rich Presence">
                         <FormSwitch
                                 label="Enable plugin"
                                 value={enabled}
                                 onValueChange={(v: boolean) => {
                                         setEnabled(v);
-                                        toggle("enabled", v);
+                                        storage.enabled = v;
                                 }}
                         />
 
@@ -36,9 +32,9 @@ export default function Settings() {
                                 value={showJoin}
                                 onValueChange={(v: boolean) => {
                                         setShowJoin(v);
-                                        toggle("showJoin", v);
+                                        storage.showJoin = v;
                                 }}
                         />
                 </FormSection>
         );
-                                                    }
+                        }

@@ -1,11 +1,13 @@
 import { before } from "@vendetta/patcher";
 import { General } from "@vendetta/ui/components";
+import { logger } from "@vendetta";
 
 export default () => before("render", General.View, (args) => {
-    const [props] = args;
-    if (!props || !props.children) return;
 
-    // sprawdzamy, czy children mają expected elementy
+    logger.log("rpcview ok");
+const [props] = args;
+    if (!props || !props.children) return;
+    
     const userChild = props.children[1];
     const presenceChild = props.children[3];
 
@@ -13,7 +15,7 @@ export default () => before("render", General.View, (args) => {
     const presenceProps = presenceChild?.props;
 
     if (userProps?.user) {
-        console.log("User ID:", userProps.user.id);
-        console.log("Presence props:", presenceProps);
+        logger.log("User ID:", userProps.user?.id);
+        logger.log("Presence props:", presenceProps);
     }
 });

@@ -1,28 +1,36 @@
-import { before } from "@vendetta/patcher";
-import { findByName } from "@vendetta/metro";
-import { logger } from "@vendetta";
+import { patcher } from "@vendetta";
+import { findByDisplayName, findByName, findByProps, findByPropsAll, findByStoreName, findByTypeNameAll, findByTypeName } from "@vendetta/metro";
+import { General } from "@vendetta/ui/components";
+import { findInReactTree } from "@vendetta/utils";
+import StatusIcons from "./StatusIcons";
+import { storage } from "@vendetta/plugin";
+import PresenceUpdatedContainer from "./PresenceUpdatedContainer";
+import React from "react";
 
-export default () => {
-    const UserProfile = findByName("UserProfile");
-    const UserStore = bunny.metro.findByStoreName("UserStore");
+const { Text, View } = General;
 
-    if (!UserProfile || !UserStore) return;
+let unpatches: Function[] = [];
 
-    return before("render", UserProfile, (args) => {
-        const [props] = args;
+export default {
+    onLoad: () => {
+        storage.dmTopBar ??= true;
+        storage.userList ??= true;
+        storage.profileUsername ??= true;
+        storage.removeDefaultMobile ??= true;
+        storage.oldUserListIcons ??= false;
 
-        if (!props?.user?.id) return;
+        const debugLabels = false;
 
-        const user = UserStore.getUser(props.user.id);
-        if (!user) return;
+        // --- PATCH: Profile Content ---
+        const UserProfileContent = findByTypeName("UserProfileContent");
+        if (UserProfileContent) {
+            unpatches.push(patcher.after("type", UserProfileContent, (_, res) => {
+                const primaryInfo = findInReactTree(res, c => c?.type?.name === "PrimaryInfo");
+                if (!primaryInfo) return res;
 
-        logger.log("User:", user);
+                patcher.after("type", primaryInfo, (_, primaryRes) => {
+                    const displayName = findInReactTree(primaryRes, c => c?.type?.name === "DisplayName");
+                    if (!displayName) return primaryRes;
 
-        // 🔥 przykład modyfikacji UI
-        if (props?.style) {
-            props.style = Array.isArray(props.style)
-                ? [...props.style, { borderWidth: 2, borderColor: "red" }]
-                : [{ borderWidth: 2, borderColor: "red" }];
-        }
-    });
-};
+                    patcher.after("type", displayName, (args, displayRes) => {
+                        const userId = args[0]?.user

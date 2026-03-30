@@ -5,7 +5,7 @@ let unpatch: (() => void) | null = null;
 
 export default {
     onLoad() {
-     //   unpatch = ViewComponent();
+        unpatch = ViewComponent();
         logger.info("Plugin loaded successfully.");
     },
     onUnload() {

@@ -1,15 +1,14 @@
 import { before } from "@vendetta/patcher";
-import { storage } from "@vendetta/plugin";
 import { findByName } from "@vendetta/metro";
 import { logger } from "@vendetta";
 
 
 export default () => {
     const UserProfile = findByName("UserProfile");
+    
     if (!UserProfile) return;
-
+    logger.log(UserProfile.user.id)
     return before("render", UserProfile, (args) => {
-        if (!storage?.enabled) return;
 
         const wrapper = args[0];
         if (!wrapper || !Array.isArray(wrapper.children)) return;

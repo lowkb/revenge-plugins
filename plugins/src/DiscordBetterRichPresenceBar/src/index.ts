@@ -15,11 +15,15 @@ function logChildrenTree(obj: any, depth = 0) {
         }
     }
 
-    if (Array.isArray(obj.children)) {
-        obj.children.forEach((c: any) => logChildrenTree(c, depth + 1));
-    } else if (obj.props?.children) {
-        logChildrenTree(obj.props.children, depth + 1);
-    }
+    const children = Array.isArray(obj.children)
+        ? obj.children
+        : obj.props?.children
+        ? Array.isArray(obj.props.children)
+            ? obj.props.children
+            : [obj.props.children]
+        : [];
+
+    children.forEach((c: any) => logChildrenTree(c, depth + 1));
 }
 
 export default {
@@ -35,8 +39,12 @@ export default {
 
         unpatches.push(
             patcher.after("type", UserProfileContent, (_, res) => {
-                logger.log("[DEBUG] UserProfileContent render - res:", res);
-                logChildrenTree(res);
+                if (!res) return res; // zabezpieczenie
+                try {
+                    logChildrenTree(res);
+                } catch (e) {
+                    logger.log("[ERROR] logChildrenTree failed:", e);
+                }
                 return res;
             })
         );

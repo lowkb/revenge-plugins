@@ -1,26 +1,29 @@
 import { before } from "@vendetta/patcher";
 import { storage } from "@vendetta/plugin";
-import { General } from "@vendetta/ui/components";
-
-export default () => before("render", General.View, (args) => {
-        if(!isEnabled) return;
-
-    const [wrapper] = args;
-    if (!wrapper || !Array.isArray(wrapper.style)) return;
+import { findByName } from "@vendetta/metro";
+import { logger } from "@vendetta";
 
 
-            const userProps   = wrapper.children?.[1]?.props;
-                const presenceProps = wrapper.children?.[3]?.props;
+export default () => {
+    const UserProfile = findByName("UserProfile");
+    if (!UserProfile) return;
 
-        
-                if (!userProps?.hasOwnProperty("user") || typeof userProps.user?.id !== "string") return;
-                if (!presenceProps?.hasOwnProperty("status") || typeof presenceProps.status !== "string") return;
+    return before("render", UserProfile, (args) => {
+        if (!storage?.enabled) return;
 
-                console.log(userProps.user?.id, presenceProps)
+        const wrapper = args[0];
+        if (!wrapper || !Array.isArray(wrapper.children)) return;
 
-                const userPresence = presenceProps.status;
+        // Szukamy dziecka, które ma status / rich presence
+        const userInfo = wrapper.children.find(c => c?.props?.user);
+        const presence = wrapper.children.find(c => c?.props?.status);
 
-                
-           
+        if (!userInfo || typeof userInfo.props.user?.id !== "string") return;
+        if (!presence || typeof presence.props.status !== "string") return;
 
-});
+        const userId = userInfo.props.user.id;
+        const status = presence.props.status;
+
+        logger.log(userId, status);
+    });
+};

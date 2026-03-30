@@ -1,3 +1,7 @@
+import { before } from "@vendetta/patcher";
+import { storage } from "@vendetta/plugin";
+import { General } from "@vendetta/ui/components";
+
 export default () => before("render", General.View, (args) => {
         if(!isEnabled) return;
 
@@ -17,6 +21,6 @@ export default () => before("render", General.View, (args) => {
                 const userPresence = presenceProps.status;
 
                 
-            }           
-    }
+           
+
 });

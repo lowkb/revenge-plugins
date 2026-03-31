@@ -4,6 +4,18 @@ import { logger } from "@vendetta";
 
 let unpatches: Function[] = [];
 
+function resolveRender(target: any): any {
+    if (!target) return null;
+
+    if (typeof target === "function") return target;
+
+    if (typeof target?.type === "function") return target.type;
+
+    if (typeof target?.type?.type === "function") return target.type.type;
+
+    return null;
+}
+
 export default {
     onLoad: () => {
         if (unpatches.length) return;
@@ -17,18 +29,15 @@ export default {
             return;
         }
 
-        const Target =
-            UserProfileContent.type?.type ??
-            UserProfileContent.type ??
-            UserProfileContent;
+        const Render = resolveRender(UserProfileContent);
 
-        if (!Target) {
-            logger.log("[DEBUG] Nie udało się znaleźć targetu do patchowania");
+        if (!Render) {
+            logger.log("[DEBUG] Nie znaleziono funkcji render");
             return;
         }
 
         unpatches.push(
-            patcher.after("type", Target, (_, res) => {
+            patcher.after("type", Render, (_, res) => {
                 if (!res) return res;
 
                 try {

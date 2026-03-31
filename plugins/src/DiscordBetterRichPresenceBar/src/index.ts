@@ -4,55 +4,63 @@ import { logger } from "@vendetta";
 
 let unpatches: Function[] = [];
 
-function logChildrenTree(obj: any, depth = 0) {
-    if (!obj) return;
-    const indent = "  ".repeat(depth);
-
-    if (obj.type?.name) {
-        logger.log(`${indent}[TYPE] ${obj.type.name} | key: ${obj.key}`);
-        if (obj.type.name === "Activity") {
-            logger.log(`${indent}>>> Activity FOUND!`, obj);
-        }
-    }
-
-    const children = Array.isArray(obj.children)
-        ? obj.children
-        : obj.props?.children
-        ? Array.isArray(obj.props.children)
-            ? obj.props.children
-            : [obj.props.children]
-        : [];
-
-    children.forEach((c: any) => logChildrenTree(c, depth + 1));
-}
-
 export default {
     onLoad: () => {
+        if (unpatches.length) return;
+
         logger.log("[DEBUG] Plugin załadowany");
 
         const UserProfileContent = findByTypeName("UserProfileContent");
+
         if (!UserProfileContent) {
             logger.log("[DEBUG] UserProfileContent nie znaleziony");
             return;
         }
-        logger.log("[DEBUG] UserProfileContent znaleziony:", UserProfileContent);
+
+        const Target =
+            UserProfileContent.type?.type ??
+            UserProfileContent.type ??
+            UserProfileContent;
+
+        if (!Target) {
+            logger.log("[DEBUG] Nie udało się znaleźć targetu do patchowania");
+            return;
+        }
 
         unpatches.push(
-            patcher.after("type", UserProfileContent, (_, res) => {
-                if (!res) return res; // zabezpieczenie
+            patcher.after("type", Target, (_, res) => {
+                if (!res) return res;
+
                 try {
-                    logChildrenTree(res);
+                    const activity = findInReactTree(
+                        res,
+                        (x) =>
+                            x?.props?.activity ||
+                            (Array.isArray(x?.props?.activities) &&
+                                x.props.activities.length > 0)
+                    );
+
+                    if (activity) {
+                        logger.log("[FOUND ACTIVITY]", activity);
+                    }
                 } catch (e) {
-                    logger.log("[ERROR] logChildrenTree failed:", e);
+                    logger.log("[ERROR]", e);
                 }
+
                 return res;
             })
         );
     },
 
     onUnload: () => {
-        logger.log("[DEBUG] Plugin odładowany, usuwanie patchy");
-        unpatches.forEach(u => u());
+        logger.log("[DEBUG] Plugin odładowany");
+
+        for (const unpatch of unpatches) {
+            try {
+                unpatch();
+            } catch {}
+        }
+
         unpatches = [];
     }
 };

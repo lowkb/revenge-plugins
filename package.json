@@ -1,16 +1,8 @@
 {
     "private": true,
     "scripts": {
-                "build": "node plugins/build.mjs"
-        },
-        "pnpm": {
-                "peerDependencyRules": {
-                        "ignoreMissing": [
-                                "react",
-                                "react-native"
-                        ]
-                }
-        },
+        "build": "node plugins/build.mjs"
+    },
     "dependencies": {
         "@rollup/plugin-commonjs": "^25.0.3",
         "@rollup/plugin-node-resolve": "^15.1.0",

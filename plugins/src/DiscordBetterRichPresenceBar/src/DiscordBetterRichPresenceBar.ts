@@ -1,131 +1,387 @@
-import { logger, metro } from "@vendetta";
+import { logger, metro, patcher } from "@vendetta";
+
+type Activity = {
+    id?: string;
+    application_id?: string;
+    name?: string;
+    buttons?: string[];
+};
+
+type Patch = () => void;
 
 class DiscordBetterRichPresenceBar {
-    static start() {
-        logger.log("[DBRP] start()");
+    private static unpatches: Patch[] = [];
 
-        const userId = "1459041073136402453";
+    private static getCurrentUserId(): string | null {
+        try {
+            const userStore =
+                metro.findByProps("getCurrentUserId") ??
+                metro.findByProps("getCurrentUser");
 
+            if (!userStore) {
+                return null;
+            }
+
+            if (typeof userStore.getCurrentUserId === "function") {
+                const id = userStore.getCurrentUserId();
+
+                if (id) {
+                    return String(id);
+                }
+            }
+
+            if (typeof userStore.getCurrentUser === "function") {
+                const user = userStore.getCurrentUser();
+
+                if (user?.id) {
+                    return String(user.id);
+                }
+            }
+        } catch {}
+
+        return null;
+    }
+
+    private static getActivities(userId: string): Activity[] {
         try {
             const store = metro.findByProps("getActivities");
 
-            if (!store) {
-                logger.error("[DBRP] Activity store not found");
-                return;
+            if (!store || typeof store.getActivities !== "function") {
+                return [];
             }
 
-            logger.log("[DBRP] Activity store found");
+            const activities = store.getActivities(userId);
 
-            const activities =
-                typeof store.getActivities === "function"
-                    ? store.getActivities(userId)
-                    : null;
+            return Array.isArray(activities)
+                ? activities
+                : [];
+        } catch {
+            return [];
+        }
+    }
 
-            if (!activities || !Array.isArray(activities)) {
-                logger.error(
-                    `[DBRP] getActivities returned invalid value: ${JSON.stringify(
-                        activities,
-                    )}`,
-                );
-                return;
+    private static getButtonUrl(
+        activity: Activity,
+        index: number,
+    ): string | null {
+        try {
+            const launchStore =
+                metro.findByProps("getActivityLaunchURL");
+
+            if (
+                launchStore &&
+                typeof launchStore.getActivityLaunchURL ===
+                    "function"
+            ) {
+                const fn = launchStore.getActivityLaunchURL;
+
+                const attempts = [
+                    () => fn.call(launchStore, activity, index),
+                    () =>
+                        fn.call(
+                            launchStore,
+                            activity,
+                            activity.buttons?.[index],
+                            index,
+                        ),
+                    () =>
+                        fn.call(
+                            launchStore,
+                            activity.id,
+                            index,
+                        ),
+                    () =>
+                        fn.call(
+                            launchStore,
+                            activity.application_id,
+                            index,
+                        ),
+                ];
+
+                for (const attempt of attempts) {
+                    try {
+                        const result = attempt();
+
+                        if (typeof result === "string") {
+                            return result;
+                        }
+
+                        if (
+                            result &&
+                            typeof result === "object"
+                        ) {
+                            const object = result as Record<
+                                string,
+                                unknown
+                            >;
+
+                            if (
+                                typeof object.url ===
+                                "string"
+                            ) {
+                                return object.url;
+                            }
+
+                            if (
+                                typeof object.button_url ===
+                                "string"
+                            ) {
+                                return object.button_url;
+                            }
+                        }
+                    } catch {}
+                }
             }
+        } catch {}
 
-            logger.log(
-                `[DBRP] activities: ${JSON.stringify(
-                    activities,
-                    (_, value) => {
-                        if (typeof value === "function") {
-                            return "[Function]";
-                        }
+        return null;
+    }
 
-                        if (typeof value === "bigint") {
-                            return value.toString();
-                        }
+    private static createButtons(
+        activity: Activity,
+    ) {
+        const React = metro.common.React;
+        const ReactNative = metro.common.ReactNative;
 
-                        return value;
+        if (!React || !ReactNative) {
+            return null;
+        }
+
+        const buttons = activity.buttons;
+
+        if (!Array.isArray(buttons) || buttons.length === 0) {
+            return null;
+        }
+
+        const {
+            View,
+            Text,
+            TouchableOpacity,
+        } = ReactNative;
+
+        const url = metro.common.url;
+
+        if (!View || !Text || !TouchableOpacity) {
+            return null;
+        }
+
+        const children = buttons.map(
+            (label, index) => {
+                const buttonUrl =
+                    this.getButtonUrl(
+                        activity,
+                        index,
+                    );
+
+                return React.createElement(
+                    TouchableOpacity,
+                    {
+                        key: `${activity.id ?? "activity"}-button-${index}`,
+                        disabled: !buttonUrl,
+                        activeOpacity: 0.7,
+                        onPress: () => {
+                            if (!buttonUrl) {
+                                return;
+                            }
+
+                            try {
+                                if (
+                                    url &&
+                                    typeof url.openURL ===
+                                        "function"
+                                ) {
+                                    url.openURL(
+                                        buttonUrl,
+                                    );
+                                }
+                            } catch (error) {
+                                logger.error(
+                                    `[DBRP] Failed to open URL: ${String(
+                                        error,
+                                    )}`,
+                                );
+                            }
+                        },
+                        style: {
+                            flex: 1,
+                            minHeight: 40,
+                            paddingHorizontal: 12,
+                            borderRadius: 8,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            backgroundColor:
+                                "#5865F2",
+                            marginLeft:
+                                index > 0 ? 6 : 0,
+                        },
                     },
-                )}`,
-            );
-
-            const activity = activities[0];
-
-            if (!activity) {
-                logger.error("[DBRP] No activity found");
-                return;
-            }
-
-            logger.log(
-                `[DBRP] activity id: ${String(activity.id)}`,
-            );
-
-            logger.log(
-                `[DBRP] activity keys: ${JSON.stringify(
-                    Object.keys(activity),
-                )}`,
-            );
-
-            const metadata = store.getActivityMetadata;
-
-            logger.log(
-                `[DBRP] getActivityMetadata typeof: ${typeof metadata}`,
-            );
-
-            if (typeof metadata !== "function") {
-                logger.error(
-                    "[DBRP] getActivityMetadata is not a function",
-                );
-                return;
-            }
-
-            logger.log(
-                `[DBRP] getActivityMetadata.length: ${metadata.length}`,
-            );
-
-            logger.log(
-                `[DBRP] getActivityMetadata source: ${String(metadata)}`,
-            );
-
-            const attempts: Array<[string, unknown]> = [
-                ["activity", activity],
-                ["activity.id", activity.id],
-                ["application_id", activity.application_id],
-                ["userId", userId],
-            ];
-
-            for (const [name, argument] of attempts) {
-                try {
-                    const result = metadata.call(store, argument);
-
-                    logger.log(
-                        `[DBRP] metadata(${name}) = ${JSON.stringify(
-                            result,
-                            (_, value) => {
-                                if (typeof value === "function") {
-                                    return "[Function]";
-                                }
-
-                                if (typeof value === "bigint") {
-                                    return value.toString();
-                                }
-
-                                return value;
+                    React.createElement(
+                        Text,
+                        {
+                            style: {
+                                color: "#FFFFFF",
+                                fontSize: 14,
+                                fontWeight: "600",
                             },
-                        )}`,
+                            numberOfLines: 1,
+                        },
+                        label,
+                    ),
+                );
+            },
+        );
+
+        return React.createElement(
+            View,
+            {
+                style: {
+                    width: "100%",
+                    flexDirection: "row",
+                    paddingHorizontal: 12,
+                    paddingTop: 8,
+                    paddingBottom: 4,
+                },
+            },
+            ...children,
+        );
+    }
+
+    private static patchActivityDisplays() {
+        const module =
+            metro.findByName(
+                "UserProfileActivityDisplays",
+                false,
+            );
+
+        if (!module) {
+            throw new Error(
+                "UserProfileActivityDisplays not found",
+            );
+        }
+
+        const target =
+            typeof module === "function"
+                ? { default: module }
+                : module;
+
+        if (typeof target.default !== "function") {
+            throw new Error(
+                "UserProfileActivityDisplays.default is not a function",
+            );
+        }
+
+        const unpatch = patcher.after(
+            target,
+            "default",
+            (
+                _,
+                args,
+                result,
+            ) => {
+                try {
+                    const props =
+                        args?.[0] ?? {};
+
+                    const currentUserId =
+                        this.getCurrentUserId();
+
+                    const profileUserId =
+                        props.userId ??
+                        props.user?.id ??
+                        props.user?.userId;
+
+                    if (
+                        !currentUserId ||
+                        !profileUserId ||
+                        String(profileUserId) !==
+                            String(currentUserId)
+                    ) {
+                        return result;
+                    }
+
+                    const activities =
+                        this.getActivities(
+                            String(currentUserId),
+                        );
+
+                    const activity =
+                        activities.find(
+                            (item) =>
+                                Array.isArray(
+                                    item.buttons,
+                                ) &&
+                                item.buttons.length >
+                                    0,
+                        );
+
+                    if (!activity) {
+                        return result;
+                    }
+
+                    const buttons =
+                        this.createButtons(
+                            activity,
+                        );
+
+                    if (!buttons) {
+                        return result;
+                    }
+
+                    const React =
+                        metro.common.React;
+
+                    if (!React) {
+                        return result;
+                    }
+
+                    return React.createElement(
+                        React.Fragment,
+                        null,
+                        result,
+                        buttons,
                     );
                 } catch (error) {
                     logger.error(
-                        `[DBRP] metadata(${name}) ERROR: ${String(error)}`,
+                        `[DBRP] Render patch error: ${String(
+                            error,
+                        )}`,
                     );
+
+                    return result;
                 }
-            }
+            },
+        );
+
+        this.unpatches.push(unpatch);
+
+        logger.log(
+            "[DBRP] UserProfileActivityDisplays patched",
+        );
+    }
+
+    static start() {
+        logger.log("[DBRP] start()");
+
+        try {
+            this.patchActivityDisplays();
         } catch (error) {
             logger.error(
-                `[DBRP] FATAL: ${String(error)}`,
+                `[DBRP] Failed to patch activity UI: ${String(
+                    error,
+                )}`,
             );
         }
     }
 
     static stop() {
+        for (const unpatch of this.unpatches) {
+            try {
+                unpatch();
+            } catch {}
+        }
+
+        this.unpatches = [];
+
         logger.log("[DBRP] stop()");
     }
 }

@@ -1,13 +1,15 @@
+import { logger } from "@vendetta";
+
 import DiscordBetterRichPresenceBar from "./DiscordBetterRichPresenceBar";
 
-export default { //hehe
-    onLoad() {
-        console.log("[DBRP] ONLOAD");
-        DiscordBetterRichPresenceBar.start();
+export default {
+    onLoad: () => {
+        logger.log("[ DiscordBetterRichPresenceBar ]: Plugin loading");
+        DiscordBetterRichPresenceBar.start()
     },
 
-    onUnload() {
-        console.log("[DBRP] ONUNLOAD");
+    onUnload: () => {
+        logger.log("[ DiscordBetterRichPresenceBar ]: Plugin unloading");
         DiscordBetterRichPresenceBar.stop();
     },
 };

@@ -1,6 +1,5 @@
 import { findByName } from "@metro/common";
 import { after } from "@lib/patcher";
-import { findInReactTree } from "@lib/utils";
 
 type ActivityButton = {
     label?: string;
@@ -141,8 +140,8 @@ const createButton = (
             onPress: () => void openUrl(url),
             style: {
                 marginRight: index === 0 ? 8 : 0,
-                marginBottom: 8,
-            },
+                marginBottom: 8
+            }
         });
     }
 
@@ -156,8 +155,8 @@ const createButton = (
                 paddingVertical: 8,
                 marginRight: index === 0 ? 8 : 0,
                 marginBottom: 8,
-                borderRadius: 6,
-            },
+                borderRadius: 6
+            }
         },
         React.createElement(
             ReactNative.Text,
@@ -177,10 +176,7 @@ const createButtons = (
         return null;
     }
 
-    const {
-        React,
-        ReactNative
-    } = runtime;
+    const { React, ReactNative } = runtime;
 
     return React.createElement(
         ReactNative.View,
@@ -188,8 +184,8 @@ const createButtons = (
             style: {
                 flexDirection: "row",
                 flexWrap: "wrap",
-                marginTop: 8,
-            },
+                marginTop: 8
+            }
         },
         buttons.map((button, index) =>
             createButton(
@@ -215,7 +211,7 @@ const patchActivityContainer = () => {
 
     const runtime = {
         React,
-        ReactNative: require("react-native"),
+        ReactNative: require("react-native")
     } as Runtime;
 
     const unpatch = after(
@@ -242,11 +238,10 @@ const patchActivityContainer = () => {
                 return result;
             }
 
-            const buttons =
-                createButtons(
-                    runtime,
-                    props.activity
-                );
+            const buttons = createButtons(
+                runtime,
+                props.activity
+            );
 
             if (!buttons) {
                 return result;
@@ -270,9 +265,9 @@ const patchActivityContainer = () => {
                         ...result.props,
                         children: [
                             ...children,
-                            buttons,
-                        ],
-                    },
+                            buttons
+                        ]
+                    }
                 };
             }
 
@@ -282,9 +277,9 @@ const patchActivityContainer = () => {
                     ...result.props,
                     children: [
                         children,
-                        buttons,
-                    ],
-                },
+                        buttons
+                    ]
+                }
             };
         }
     );
@@ -308,8 +303,7 @@ export default {
         for (const unpatch of patches.splice(0)) {
             try {
                 unpatch();
-            } catch {
-            }
+            } catch {}
         }
-    },
+    }
 };

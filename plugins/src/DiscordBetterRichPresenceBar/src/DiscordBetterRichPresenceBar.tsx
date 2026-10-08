@@ -3,160 +3,183 @@ import { findByTypeName } from "@vendetta/metro";
 
 type Unpatch = () => unknown;
 
-let unpatch: Unpatch | null = null;
-let started = false;
-let loggedResults = new WeakSet<object>();
-
-function getTypeName(node: any): string {
-    const type = node?.type;
-
-    if (typeof type === "string") {
-        return type;
-    }
-
-    if (typeof type === "function") {
-        return type.displayName || type.name || "Anonymous";
-    }
-
-    if (type && typeof type === "object") {
-        return type.displayName || type.name || "Object";
-    }
-
-    return "Unknown";
+interface InspectState {
+    count: number;
 }
 
-function inspectTree(
-    node: any,
-    lines: string[],
-    state: { count: number },
-    depth = 0,
-    maxDepth = 12,
-): void {
-    if (state.count >= 500 || depth > maxDepth) {
-        return;
-    }
+export default class DiscordBetterRichPresenceBar {
+    private static unpatch: Unpatch | null = null;
+    private static started = false;
+    private static loggedResults = new WeakSet<object>();
 
-    if (!node || typeof node !== "object") {
-        return;
-    }
+    private static getTypeName(node: any): string {
+        const type = node?.type;
 
-    state.count++;
-
-    const indent = "  ".repeat(depth);
-    const typeName = getTypeName(node);
-    const props = node?.props;
-
-    const propKeys =
-        props && typeof props === "object"
-            ? Object.keys(props)
-            : [];
-
-    lines.push(
-        `${indent}${typeName} props=[${propKeys.join(", ")}]`,
-    );
-
-    const children = props?.children;
-
-    if (Array.isArray(children)) {
-        for (const child of children) {
-            inspectTree(
-                child,
-                lines,
-                state,
-                depth + 1,
-                maxDepth,
-            );
+        if (typeof type === "string") {
+            return type;
         }
 
-        return;
+        if (typeof type === "function") {
+            return type.displayName || type.name || "Anonymous";
+        }
+
+        if (type && typeof type === "object") {
+            return type.displayName || type.name || "Object";
+        }
+
+        return "Unknown";
     }
 
-    inspectTree(
-        children,
-        lines,
-        state,
-        depth + 1,
-        maxDepth,
-    );
-}
-
-function patchUserProfileContent(): void {
-    const UserProfileContent = findByTypeName("UserProfileContent");
-
-    if (!UserProfileContent) {
-        console.log("[DBRP] UserProfileContent not found");
-        return;
-    }
-
-    console.log(
-        "[DBRP] UserProfileContent found:",
-        UserProfileContent,
-    );
-
-    unpatch = after(
-        "type",
-        UserProfileContent,
-        (_args, result) => {
-            if (
-                !result ||
-                typeof result !== "object" ||
-                loggedResults.has(result)
-            ) {
-                return;
-            }
-
-            loggedResults.add(result);
-
-            const lines: string[] = [];
-            const state = { count: 0 };
-
-            inspectTree(result, lines, state);
-
-            console.log(
-                `[DBRP] UserProfileContent tree (${state.count} nodes):\n${lines.join("\n")}`,
-            );
-        },
-    );
-
-    console.log("[DBRP] UserProfileContent patched");
-}
-
-export default {
-    start() {
-        if (started) {
+    private static inspectTree(
+        node: any,
+        lines: string[],
+        state: InspectState,
+        depth = 0,
+        maxDepth = 12,
+    ): void {
+        if (state.count >= 500 || depth > maxDepth) {
             return;
         }
 
-        started = true;
+        if (!node || typeof node !== "object") {
+            return;
+        }
+
+        state.count++;
+
+        const indent = "  ".repeat(depth);
+        const typeName = this.getTypeName(node);
+        const props = node.props;
+
+        const propKeys =
+            props && typeof props === "object"
+                ? Object.keys(props)
+                : [];
+
+        lines.push(
+            `${indent}${typeName} props=[${propKeys.join(", ")}]`,
+        );
+
+        const children = props?.children;
+
+        if (Array.isArray(children)) {
+            for (const child of children) {
+                this.inspectTree(
+                    child,
+                    lines,
+                    state,
+                    depth + 1,
+                    maxDepth,
+                );
+            }
+
+            return;
+        }
+
+        this.inspectTree(
+            children,
+            lines,
+            state,
+            depth + 1,
+            maxDepth,
+        );
+    }
+
+    private static patchUserProfileContent(): void {
+        const UserProfileContent =
+            findByTypeName("UserProfileContent");
+
+        if (!UserProfileContent) {
+            console.log(
+                "[DBRP] UserProfileContent not found",
+            );
+
+            return;
+        }
+
+        console.log(
+            "[DBRP] UserProfileContent found:",
+            UserProfileContent,
+        );
+
+        this.unpatch = after(
+            "type",
+            UserProfileContent,
+            (_args, result) => {
+                if (
+                    !result ||
+                    typeof result !== "object" ||
+                    this.loggedResults.has(result)
+                ) {
+                    return;
+                }
+
+                this.loggedResults.add(result);
+
+                const lines: string[] = [];
+                const state: InspectState = {
+                    count: 0,
+                };
+
+                this.inspectTree(
+                    result,
+                    lines,
+                    state,
+                );
+
+                console.log(
+                    `[DBRP] UserProfileContent tree (${state.count} nodes):\n${lines.join("\n")}`,
+                );
+            },
+        );
+
+        console.log(
+            "[DBRP] UserProfileContent patched",
+        );
+    }
+
+    public static start(): void {
+        if (this.started) {
+            return;
+        }
+
+        this.started = true;
 
         console.log("[DBRP] Starting");
 
         try {
-            patchUserProfileContent();
+            this.patchUserProfileContent();
         } catch (error) {
-            started = false;
-            console.error("[DBRP] Failed to start:", error);
-        }
-    },
+            this.started = false;
 
-    stop() {
-        if (!started) {
+            console.error(
+                "[DBRP] Failed to start:",
+                error,
+            );
+        }
+    }
+
+    public static stop(): void {
+        if (!this.started) {
             return;
         }
 
-        started = false;
+        this.started = false;
 
         console.log("[DBRP] Stopping");
 
         try {
-            unpatch?.();
+            this.unpatch?.();
         } catch (error) {
-            console.error("[DBRP] Failed to unpatch:", error);
+            console.error(
+                "[DBRP] Failed to unpatch:",
+                error,
+            );
         } finally {
-            unpatch = null;
-            loggedResults = new WeakSet<object>();
+            this.unpatch = null;
+            this.loggedResults = new WeakSet<object>();
         }
 
         console.log("[DBRP] Stopped");
-    },
-};
+    }
+}

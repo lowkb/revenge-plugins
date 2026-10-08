@@ -1,490 +1,607 @@
-import { after, before } from "@vendetta/patcher";
-import {
-    findByProps,
-    findByStoreName,
-} from "@vendetta/metro";
 import { logger } from "@vendetta";
-import { React, ReactNative } from "@vendetta/metro/common";
+import { after } from "@vendetta/patcher";
+import {
+    findByStoreName,
+    findByTypeName,
+} from "@vendetta/metro";
+import {
+    React,
+    ReactNative,
+} from "@vendetta/metro/common";
+import { showToast } from "@vendetta/ui/toasts";
 
 type Unpatch = () => unknown;
 
-const patches: Unpatch[] = [];
+interface ActivityButton {
+    label: string;
+    url?: string;
+}
 
-const loggedObjects = new WeakSet<object>();
-const loggedCalls = new Set<string>();
+interface Activity {
+    type?: number;
+    name?: string;
+    details?: string;
+    state?: string;
+    application_id?: string;
+    buttons?: Array<
+        string | {
+            label?: string;
+            url?: string;
+        }
+    >;
+    metadata?: {
+        button_urls?: string[];
+    };
+}
 
-const ACTIVITY_NAMES = [
-    "activity",
-    "activities",
-    "presence",
-    "richPresence",
-    "userActivities",
-    "application",
-    "applications",
-];
+interface RichPresenceButtonsProps {
+    userId?: string;
+}
 
-const METHOD_NAMES = [
-    "getActivity",
-    "getActivities",
-    "getUserActivities",
-    "getPresence",
-    "getPresenceForUser",
-    "getUserPresence",
-    "getUserActivity",
-    "getActivitiesForUser",
-    "getPresenceForUserId",
-    "getUser",
-    "getUserById",
-];
+const styles = {
+    container: {
+        marginTop: 8,
+        marginHorizontal: 0,
+        padding: 12,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: "#97979f0a",
+        backgroundColor: "#97979f14",
+    },
 
-function log(
-    message: string,
-    ...args: unknown[]
-): void {
-    logger.log(
-        `[DiscordBetterRichPresenceBar] ${message}`,
-        ...args,
+    header: {
+        marginBottom: 8,
+    },
+
+    title: {
+        color: "#ffffff",
+        fontSize: 15,
+        fontWeight: "600",
+    },
+
+    subtitle: {
+        marginTop: 2,
+        color: "#b5bac1",
+        fontSize: 12,
+    },
+
+    buttons: {
+        flexDirection: "row" as const,
+        gap: 8,
+    },
+
+    button: {
+        flex: 1,
+        minHeight: 40,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        borderRadius: 8,
+        backgroundColor: "#5865f2",
+        alignItems: "center" as const,
+        justifyContent: "center" as const,
+    },
+
+    buttonDisabled: {
+        backgroundColor: "#4e5058",
+        opacity: 0.8,
+    },
+
+    buttonText: {
+        color: "#ffffff",
+        fontSize: 13,
+        fontWeight: "600",
+        textAlign: "center" as const,
+    },
+};
+
+function normalizeButtons(
+    activity: Activity,
+): ActivityButton[] {
+    const buttons = activity.buttons;
+
+    if (!Array.isArray(buttons)) {
+        return [];
+    }
+
+    const urls =
+        Array.isArray(
+            activity.metadata?.button_urls,
+        )
+            ? activity.metadata!.button_urls!
+            : [];
+
+    return buttons
+        .slice(0, 2)
+        .map((button, index) => {
+            if (
+                typeof button === "string"
+            ) {
+                return {
+                    label: button,
+                    url: urls[index],
+                };
+            }
+
+            return {
+                label:
+                    button?.label ||
+                    `Button ${index + 1}`,
+                url:
+                    button?.url ||
+                    urls[index],
+            };
+        })
+        .filter(
+            (button) =>
+                Boolean(button.label),
+        );
+}
+
+function getActivities(
+    userId?: string,
+): Activity[] {
+    if (!userId) {
+        return [];
+    }
+
+    try {
+        const PresenceStore =
+            findByStoreName(
+                "PresenceStore",
+            );
+
+        if (
+            !PresenceStore ||
+            typeof PresenceStore.getActivities !==
+                "function"
+        ) {
+            return [];
+        }
+
+        const activities =
+            PresenceStore.getActivities(
+                userId,
+            );
+
+        if (!Array.isArray(activities)) {
+            return [];
+        }
+
+        return activities;
+    } catch (error) {
+        logger.error(
+            `[DiscordBetterRichPresenceBar] Failed to get activities: ${String(error)}`,
+        );
+
+        return [];
+    }
+}
+
+async function openUrl(
+    url: string,
+): Promise<void> {
+    if (
+        !url ||
+        !/^https?:\/\//i.test(url)
+    ) {
+        showToast(
+            "Rich Presence button has no valid URL",
+        );
+
+        return;
+    }
+
+    try {
+        const Linking =
+            ReactNative?.Linking;
+
+        if (
+            Linking &&
+            typeof Linking.openURL ===
+                "function"
+        ) {
+            await Linking.openURL(url);
+
+            return;
+        }
+
+        showToast(
+            "Unable to open Rich Presence URL",
+        );
+    } catch (error) {
+        logger.error(
+            `[DiscordBetterRichPresenceBar] Failed to open URL: ${String(error)}`,
+        );
+
+        showToast(
+            "Failed to open Rich Presence URL",
+        );
+    }
+}
+
+function RichPresenceButtons(
+    props: RichPresenceButtonsProps,
+) {
+    const [activities, setActivities] =
+        React.useState<Activity[]>(() =>
+            getActivities(
+                props.userId,
+            ),
+        );
+
+    React.useEffect(() => {
+        let mounted = true;
+
+        const update = () => {
+            if (!mounted) {
+                return;
+            }
+
+            setActivities(
+                getActivities(
+                    props.userId,
+                ),
+            );
+        };
+
+        update();
+
+        const interval =
+            setInterval(
+                update,
+                1000,
+            );
+
+        return () => {
+            mounted = false;
+            clearInterval(interval);
+        };
+    }, [props.userId]);
+
+    const activityData =
+        activities
+            .map((activity) => ({
+                activity,
+                buttons:
+                    normalizeButtons(
+                        activity,
+                    ),
+            }))
+            .filter(
+                ({ buttons }) =>
+                    buttons.length > 0,
+            );
+
+    if (
+        activityData.length === 0
+    ) {
+        return null;
+    }
+
+    const { View, Text, TouchableOpacity } =
+        ReactNative;
+
+    const elements: any[] = [];
+
+    for (
+        const {
+            activity,
+            buttons,
+        } of activityData
+    ) {
+        elements.push(
+            React.createElement(
+                View,
+                {
+                    key:
+                        activity.id ||
+                        activity.application_id ||
+                        Math.random(),
+                    style:
+                        styles.container,
+                },
+
+                React.createElement(
+                    View,
+                    {
+                        style:
+                            styles.header,
+                    },
+
+                    React.createElement(
+                        Text,
+                        {
+                            style:
+                                styles.title,
+                            numberOfLines: 1,
+                        },
+                        activity.name ||
+                            "Rich Presence",
+                    ),
+
+                    activity.details ||
+                    activity.state
+                        ? React.createElement(
+                              Text,
+                              {
+                                  style:
+                                      styles.subtitle,
+                                  numberOfLines: 2,
+                              },
+                              [
+                                  activity.details,
+                                  activity.state,
+                              ]
+                                  .filter(
+                                      Boolean,
+                                  )
+                                  .join(
+                                      " • ",
+                                  ),
+                          )
+                        : null,
+                ),
+
+                React.createElement(
+                    View,
+                    {
+                        style:
+                            styles.buttons,
+                    },
+                    ...buttons.map(
+                        (
+                            button,
+                            index,
+                        ) => {
+                            const hasUrl =
+                                Boolean(
+                                    button.url &&
+                                        /^https?:\/\//i.test(
+                                            button.url,
+                                        ),
+                                );
+
+                            return React.createElement(
+                                TouchableOpacity,
+                                {
+                                    key: `${button.label}-${index}`,
+                                    style: [
+                                        styles.button,
+                                        !hasUrl &&
+                                            styles.buttonDisabled,
+                                    ],
+                                    activeOpacity:
+                                        0.75,
+                                    onPress:
+                                        () => {
+                                            if (
+                                                !hasUrl
+                                            ) {
+                                                showToast(
+                                                    "This Rich Presence button has no URL",
+                                                );
+
+                                                return;
+                                            }
+
+                                            void openUrl(
+                                                button.url!,
+                                            );
+                                        },
+                                },
+                                React.createElement(
+                                    Text,
+                                    {
+                                        style:
+                                            styles.buttonText,
+                                        numberOfLines: 1,
+                                    },
+                                    button.label,
+                                ),
+                            );
+                        },
+                    ),
+                ),
+            ),
+        );
+    }
+
+    return React.createElement(
+        React.Fragment,
+        null,
+        ...elements,
     );
 }
 
-function error(
-    message: string,
-    ...args: unknown[]
-): void {
-    logger.error(
-        `[DiscordBetterRichPresenceBar] ${message}`,
-        ...args,
-    );
-}
-
-function serialize(
-    value: any,
-    depth = 0,
-    seen = new WeakSet<object>(),
+function getTypeName(
+    type: any,
 ): string {
-    if (value === null) {
-        return "null";
-    }
-
-    if (value === undefined) {
-        return "undefined";
-    }
-
-    if (typeof value === "string") {
-        return JSON.stringify(value);
+    if (
+        typeof type === "string"
+    ) {
+        return type;
     }
 
     if (
-        typeof value === "number" ||
-        typeof value === "boolean" ||
-        typeof value === "bigint"
+        typeof type === "function"
     ) {
-        return String(value);
+        return (
+            type.displayName ||
+            type.name ||
+            "Anonymous"
+        );
     }
 
-    if (typeof value === "function") {
-        return `[Function ${value.name || "anonymous"}]`;
+    if (
+        type &&
+        typeof type === "object"
+    ) {
+        return (
+            type.displayName ||
+            type.name ||
+            "Object"
+        );
     }
 
-    if (typeof value !== "object") {
-        return String(value);
+    return "Unknown";
+}
+
+function injectIntoTree(
+    node: any,
+    depth = 0,
+): {
+    node: any;
+    changed: boolean;
+} {
+    if (
+        !node ||
+        typeof node !== "object" ||
+        depth > 30
+    ) {
+        return {
+            node,
+            changed: false,
+        };
     }
 
-    if (seen.has(value)) {
-        return "[Circular]";
-    }
+    if (
+        getTypeName(node.type) ===
+        "UserProfileActivity"
+    ) {
+        const userId =
+            node.props?.user?.id;
 
-    if (depth >= 3) {
-        return `[${value.constructor?.name || "Object"}]`;
-    }
+        if (!userId) {
+            return {
+                node,
+                changed: false,
+            };
+        }
 
-    seen.add(value);
+        const injected =
+            React.createElement(
+                React.Fragment,
+                {
+                    key:
+                        `dbrp-${userId}`,
+                },
 
-    if (Array.isArray(value)) {
-        const items = value
-            .slice(0, 20)
-            .map((item) =>
-                serialize(
-                    item,
-                    depth + 1,
-                    seen,
+                node,
+
+                React.createElement(
+                    RichPresenceButtons,
+                    {
+                        userId,
+                    },
                 ),
             );
 
-        if (value.length > 20) {
-            items.push(
-                `... ${value.length - 20} more`,
-            );
-        }
-
-        return `[${items.join(", ")}]`;
+        return {
+            node: injected,
+            changed: true,
+        };
     }
 
-    const entries: string[] = [];
+    const props = node.props;
 
-    for (const key of Object.keys(value).slice(0, 50)) {
-        try {
-            entries.push(
-                `${key}: ${serialize(
-                    value[key],
-                    depth + 1,
-                    seen,
-                )}`,
-            );
-        } catch {
-            entries.push(
-                `${key}: [Unreadable]`,
-            );
-        }
-    }
-
-    return `{ ${entries.join(", ")} }`;
-}
-
-function getKeys(
-    value: any,
-): string[] {
     if (
-        !value ||
-        typeof value !== "object"
+        !props ||
+        typeof props !== "object"
     ) {
-        return [];
+        return {
+            node,
+            changed: false,
+        };
     }
 
-    try {
-        return Object.keys(value);
-    } catch {
-        return [];
-    }
-}
+    const children =
+        props.children;
 
-function logModule(
-    name: string,
-    module: any,
-): void {
     if (
-        !module ||
-        typeof module !== "object"
+        Array.isArray(children)
     ) {
-        return;
-    }
+        let changed = false;
 
-    if (loggedObjects.has(module)) {
-        return;
-    }
-
-    loggedObjects.add(module);
-
-    const keys = getKeys(module);
-
-    log(
-        `${name} found`,
-    );
-
-    log(
-        `${name} keys: ${keys.join(", ")}`,
-    );
-
-    const interesting = keys.filter(
-        (key) =>
-            ACTIVITY_NAMES.some((name) =>
-                key.toLowerCase().includes(name),
-            ) ||
-            METHOD_NAMES.includes(key),
-    );
-
-    if (interesting.length > 0) {
-        log(
-            `${name} interesting keys: ${interesting.join(", ")}`,
-        );
-    }
-}
-
-function patchMethod(
-    moduleName: string,
-    module: any,
-    methodName: string,
-): void {
-    if (
-        !module ||
-        typeof module[methodName] !== "function"
-    ) {
-        return;
-    }
-
-    const callId =
-        `${moduleName}.${methodName}`;
-
-    if (loggedCalls.has(callId)) {
-        return;
-    }
-
-    loggedCalls.add(callId);
-
-    log(
-        `Patching ${callId}`,
-    );
-
-    patches.push(
-        before(
-            methodName,
-            module,
-            (args) => {
-                try {
-                    log(
-                        `${callId}() args: ${serialize(args)}`,
-                    );
-                } catch (e) {
-                    error(
-                        `${callId} args dump failed: ${String(e)}`,
-                    );
-                }
-
-                return args;
-            },
-        ),
-    );
-
-    patches.push(
-        after(
-            methodName,
-            module,
-            (args, result) => {
-                try {
-                    const serialized =
-                        serialize(result);
+        const nextChildren =
+            children.map(
+                (child) => {
+                    const result =
+                        injectIntoTree(
+                            child,
+                            depth + 1,
+                        );
 
                     if (
-                        serialized.includes("activity") ||
-                        serialized.includes("Activity") ||
-                        serialized.includes("application") ||
-                        serialized.includes("Application") ||
-                        serialized.includes("spotify") ||
-                        serialized.includes("discord")
+                        result.changed
                     ) {
-                        log(
-                            `${callId}() RESULT: ${serialized}`,
-                        );
+                        changed = true;
                     }
-                } catch (e) {
-                    error(
-                        `${callId} result dump failed: ${String(e)}`,
-                    );
-                }
 
-                return result;
-            },
-        ),
-    );
-}
-
-function inspectStore(
-    storeName: string,
-): void {
-    try {
-        const store =
-            findByStoreName(storeName);
-
-        if (!store) {
-            log(
-                `${storeName} not found`,
+                    return result.node;
+                },
             );
 
-            return;
+        if (!changed) {
+            return {
+                node,
+                changed: false,
+            };
         }
 
-        logModule(
-            storeName,
-            store,
-        );
-
-        for (const method of METHOD_NAMES) {
-            patchMethod(
-                storeName,
-                store,
-                method,
-            );
-        }
-
-        for (const key of getKeys(store)) {
-            if (
-                typeof store[key] !== "function"
-            ) {
-                continue;
-            }
-
-            const lower =
-                key.toLowerCase();
-
-            if (
-                lower.includes("activ") ||
-                lower.includes("presen") ||
-                lower.includes("rpc") ||
-                lower.includes("rich")
-            ) {
-                patchMethod(
-                    storeName,
-                    store,
-                    key,
-                );
-            }
-        }
-    } catch (e) {
-        error(
-            `${storeName} inspection failed: ${String(e)}`,
-        );
+        return {
+            node:
+                React.cloneElement(
+                    node,
+                    {
+                        children:
+                            nextChildren,
+                    },
+                ),
+            changed: true,
+        };
     }
-}
 
-function inspectModuleByProps(
-    name: string,
-    props: string[],
-): void {
-    try {
-        const module =
-            findByProps(...props);
-
-        if (!module) {
-            log(
-                `${name} not found (${props.join(", ")})`,
-            );
-
-            return;
-        }
-
-        logModule(
-            `${name} [${props.join(", ")}]`,
-            module,
-        );
-
-        for (const method of getKeys(module)) {
-            if (
-                typeof module[method] !== "function"
-            ) {
-                continue;
-            }
-
-            const lower =
-                method.toLowerCase();
-
-            if (
-                lower.includes("activ") ||
-                lower.includes("presen") ||
-                lower.includes("rpc") ||
-                lower.includes("rich") ||
-                lower.includes("application")
-            ) {
-                patchMethod(
-                    name,
-                    module,
-                    method,
-                );
-            }
-        }
-    } catch (e) {
-        error(
-            `${name} inspection failed: ${String(e)}`,
-        );
-    }
-}
-
-function inspectKnownStores(): void {
-    const stores = [
-        "PresenceStore",
-        "ActivityStore",
-        "UserStore",
-        "GuildMemberStore",
-        "ApplicationStore",
-        "ApplicationStateStore",
-        "UserProfileStore",
-    ];
-
-    for (const store of stores) {
-        inspectStore(store);
-    }
-}
-
-function inspectKnownModules(): void {
-    const candidates: Array<
-        [string, string[]]
-    > = [
-        [
-            "ActivityModule",
-            ["getActivities"],
-        ],
-        [
-            "ActivityModule",
-            ["getActivity"],
-        ],
-        [
-            "PresenceModule",
-            ["getPresence"],
-        ],
-        [
-            "PresenceModule",
-            ["getPresenceForUser"],
-        ],
-        [
-            "PresenceModule",
-            ["getUserPresence"],
-        ],
-        [
-            "RichPresenceModule",
-            ["getRichPresence"],
-        ],
-        [
-            "RichPresenceModule",
-            ["getActivities", "getActivity"],
-        ],
-        [
-            "UserActivityModule",
-            ["getUserActivities"],
-        ],
-        [
-            "ApplicationActivityModule",
-            ["getActivitiesForUser"],
-        ],
-    ];
-
-    for (
-        const [name, props] of candidates
+    if (
+        children &&
+        typeof children ===
+            "object"
     ) {
-        inspectModuleByProps(
-            name,
-            props,
-        );
-    }
-}
-
-function inspectReact(): void {
-    try {
-        log(
-            `React available: ${typeof React}`,
-        );
-
-        log(
-            `ReactNative available: ${typeof ReactNative}`,
-        );
-
-        if (React) {
-            log(
-                `React keys: ${Object.keys(React).join(", ")}`,
+        const result =
+            injectIntoTree(
+                children,
+                depth + 1,
             );
+
+        if (!result.changed) {
+            return {
+                node,
+                changed: false,
+            };
         }
 
-        if (ReactNative) {
-            log(
-                `ReactNative keys: ${Object.keys(ReactNative).slice(0, 100).join(", ")}`,
-            );
-        }
-    } catch (e) {
-        error(
-            `React inspection failed: ${String(e)}`,
-        );
+        return {
+            node:
+                React.cloneElement(
+                    node,
+                    {
+                        children:
+                            result.node,
+                    },
+                ),
+            changed: true,
+        };
     }
+
+    return {
+        node,
+        changed: false,
+    };
 }
 
 export class DiscordBetterRichPresenceBar {
+    private unpatch: Unpatch | null =
+        null;
+
     private started = false;
 
     public start(): void {
@@ -494,19 +611,17 @@ export class DiscordBetterRichPresenceBar {
 
         this.started = true;
 
-        log("Plugin loaded");
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin loaded",
+        );
 
         try {
-            inspectReact();
-            inspectKnownStores();
-            inspectKnownModules();
+            this.patchUserProfileContent();
+        } catch (error) {
+            this.started = false;
 
-            log(
-                `Debugger installed: ${patches.length} patches`,
-            );
-        } catch (e) {
-            error(
-                `Debugger failed: ${String(e)}`,
+            logger.error(
+                `[DiscordBetterRichPresenceBar] Failed to start: ${String(error)}`,
             );
         }
     }
@@ -518,25 +633,87 @@ export class DiscordBetterRichPresenceBar {
 
         this.started = false;
 
-        log(
-            `Removing ${patches.length} patches`,
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin unloading",
         );
 
-        for (
-            const unpatch of patches.splice(0)
+        const unpatch =
+            this.unpatch;
+
+        this.unpatch = null;
+
+        if (
+            typeof unpatch ===
+            "function"
         ) {
             try {
                 unpatch();
-            } catch (e) {
-                error(
-                    `Failed to unpatch: ${String(e)}`,
+            } catch (error) {
+                logger.error(
+                    `[DiscordBetterRichPresenceBar] Failed to unpatch: ${String(error)}`,
                 );
             }
         }
 
-        loggedCalls.clear();
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin unloaded",
+        );
+    }
 
-        log("Debugger stopped");
+    private patchUserProfileContent(): void {
+        const UserProfileContent =
+            findByTypeName(
+                "UserProfileContent",
+            );
+
+        if (
+            !UserProfileContent
+        ) {
+            logger.log(
+                "[DiscordBetterRichPresenceBar] UserProfileContent not found",
+            );
+
+            return;
+        }
+
+        logger.log(
+            "[DiscordBetterRichPresenceBar] UserProfileContent found",
+        );
+
+        this.unpatch = after(
+            "type",
+            UserProfileContent,
+            (_args, result) => {
+                if (
+                    !result ||
+                    typeof result !==
+                        "object"
+                ) {
+                    return result;
+                }
+
+                const injected =
+                    injectIntoTree(
+                        result,
+                    );
+
+                if (
+                    !injected.changed
+                ) {
+                    return result;
+                }
+
+                logger.log(
+                    "[DiscordBetterRichPresenceBar] Rich Presence buttons injected",
+                );
+
+                return injected.node;
+            },
+        );
+
+        logger.log(
+            "[DiscordBetterRichPresenceBar] UserProfileContent patched",
+        );
     }
 }
 

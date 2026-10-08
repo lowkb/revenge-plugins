@@ -12,109 +12,84 @@ import { showToast } from "@vendetta/ui/toasts";
 
 type Unpatch = () => unknown;
 
-interface ActivityButton {
-    label: string;
-    url?: string;
-}
-
 interface Activity {
-    type?: number;
+    id?: string;
+    application_id?: string;
     name?: string;
     details?: string;
     state?: string;
-    application_id?: string;
-    buttons?: Array<
-        string | {
-            label?: string;
-            url?: string;
-        }
-    >;
+    type?: number;
+    buttons?: unknown[];
     metadata?: {
         button_urls?: string[];
     };
 }
 
-interface RichPresenceButtonsProps {
-    userId?: string;
+interface ActivityButton {
+    label: string;
+    url?: string;
 }
 
-const styles = {
-    container: {
-        marginTop: 8,
-        marginHorizontal: 0,
-        padding: 12,
-        borderRadius: 12,
-        borderWidth: 1,
-        borderColor: "#97979f0a",
-        backgroundColor: "#97979f14",
-    },
+const h = React.createElement;
 
-    header: {
-        marginBottom: 8,
-    },
+function getActivities(
+    userId: string,
+): Activity[] {
+    try {
+        const PresenceStore =
+            findByStoreName("PresenceStore");
 
-    title: {
-        color: "#ffffff",
-        fontSize: 15,
-        fontWeight: "600",
-    },
+        if (
+            !PresenceStore ||
+            typeof PresenceStore.getActivities !==
+                "function"
+        ) {
+            logger.log(
+                "[DBRP] PresenceStore.getActivities not found",
+            );
 
-    subtitle: {
-        marginTop: 2,
-        color: "#b5bac1",
-        fontSize: 12,
-    },
+            return [];
+        }
 
-    buttons: {
-        flexDirection: "row" as const,
-        gap: 8,
-    },
+        const result =
+            PresenceStore.getActivities(
+                userId,
+            );
 
-    button: {
-        flex: 1,
-        minHeight: 40,
-        paddingHorizontal: 12,
-        paddingVertical: 9,
-        borderRadius: 8,
-        backgroundColor: "#5865f2",
-        alignItems: "center" as const,
-        justifyContent: "center" as const,
-    },
+        if (!Array.isArray(result)) {
+            return [];
+        }
 
-    buttonDisabled: {
-        backgroundColor: "#4e5058",
-        opacity: 0.8,
-    },
+        return result;
+    } catch (error) {
+        logger.error(
+            `[DBRP] getActivities failed: ${String(error)}`,
+        );
 
-    buttonText: {
-        color: "#ffffff",
-        fontSize: 13,
-        fontWeight: "600",
-        textAlign: "center" as const,
-    },
-};
+        return [];
+    }
+}
 
-function normalizeButtons(
+function getButtons(
     activity: Activity,
 ): ActivityButton[] {
-    const buttons = activity.buttons;
-
-    if (!Array.isArray(buttons)) {
+    if (
+        !Array.isArray(
+            activity.buttons,
+        )
+    ) {
         return [];
     }
 
     const urls =
-        Array.isArray(
-            activity.metadata?.button_urls,
-        )
-            ? activity.metadata!.button_urls!
-            : [];
+        activity.metadata?.button_urls ??
+        [];
 
-    return buttons
-        .slice(0, 2)
+    return activity.buttons
         .map((button, index) => {
             if (
-                typeof button === "string"
+                typeof button ===
+                "string"
             ) {
                 return {
                     label: button,
@@ -122,95 +97,61 @@ function normalizeButtons(
                 };
             }
 
-            return {
-                label:
-                    button?.label ||
-                    `Button ${index + 1}`,
-                url:
-                    button?.url ||
-                    urls[index],
-            };
+            if (
+                button &&
+                typeof button ===
+                    "object"
+            ) {
+                const value =
+                    button as {
+                        label?: string;
+                        url?: string;
+                    };
+
+                return {
+                    label:
+                        value.label ??
+                        `Button ${index + 1}`,
+                    url:
+                        value.url ??
+                        urls[index],
+                };
+            }
+
+            return null;
         })
         .filter(
-            (button) =>
-                Boolean(button.label),
-        );
+            (
+                button,
+            ): button is ActivityButton =>
+                Boolean(
+                    button?.label,
+                ),
+        )
+        .slice(0, 2);
 }
 
-function getActivities(
-    userId?: string,
-): Activity[] {
-    if (!userId) {
-        return [];
-    }
-
-    try {
-        const PresenceStore =
-            findByStoreName(
-                "PresenceStore",
-            );
-
-        if (
-            !PresenceStore ||
-            typeof PresenceStore.getActivities !==
-                "function"
-        ) {
-            return [];
-        }
-
-        const activities =
-            PresenceStore.getActivities(
-                userId,
-            );
-
-        if (!Array.isArray(activities)) {
-            return [];
-        }
-
-        return activities;
-    } catch (error) {
-        logger.error(
-            `[DiscordBetterRichPresenceBar] Failed to get activities: ${String(error)}`,
-        );
-
-        return [];
-    }
-}
-
-async function openUrl(
-    url: string,
+async function openButton(
+    url?: string,
 ): Promise<void> {
     if (
         !url ||
         !/^https?:\/\//i.test(url)
     ) {
         showToast(
-            "Rich Presence button has no valid URL",
+            "This Rich Presence button has no URL",
         );
 
         return;
     }
 
     try {
-        const Linking =
-            ReactNative?.Linking;
-
-        if (
-            Linking &&
-            typeof Linking.openURL ===
-                "function"
-        ) {
-            await Linking.openURL(url);
-
-            return;
-        }
-
-        showToast(
-            "Unable to open Rich Presence URL",
+        await ReactNative.Linking.openURL(
+            url,
         );
     } catch (error) {
         logger.error(
-            `[DiscordBetterRichPresenceBar] Failed to open URL: ${String(error)}`,
+            `[DBRP] Failed to open URL: ${String(error)}`,
         );
 
         showToast(
@@ -219,113 +160,158 @@ async function openUrl(
     }
 }
 
-function RichPresenceButtons(
-    props: RichPresenceButtonsProps,
+function createButton(
+    button: ActivityButton,
+    index: number,
 ) {
-    const [activities, setActivities] =
-        React.useState<Activity[]>(() =>
-            getActivities(
-                props.userId,
-            ),
+    const {
+        TouchableOpacity,
+        Text,
+    } = ReactNative;
+
+    const validUrl =
+        typeof button.url ===
+            "string" &&
+        /^https?:\/\//i.test(
+            button.url,
         );
 
-    React.useEffect(() => {
-        let mounted = true;
-
-        const update = () => {
-            if (!mounted) {
-                return;
-            }
-
-            setActivities(
-                getActivities(
-                    props.userId,
+    return h(
+        TouchableOpacity,
+        {
+            key: `${button.label}-${index}`,
+            activeOpacity: 0.7,
+            onPress: () =>
+                void openButton(
+                    button.url,
                 ),
-            );
-        };
+            style: {
+                flex: 1,
+                minHeight: 40,
+                borderRadius: 8,
+                paddingHorizontal: 12,
+                alignItems: "center",
+                justifyContent:
+                    "center",
+                backgroundColor:
+                    validUrl
+                        ? "#5865F2"
+                        : "#4E5058",
+            },
+        },
+        h(
+            Text,
+            {
+                style: {
+                    color: "#FFFFFF",
+                    fontSize: 13,
+                    fontWeight:
+                        "600",
+                },
+                numberOfLines: 1,
+            },
+            button.label,
+        ),
+    );
+}
 
-        update();
+function createPresenceView(
+    activities: Activity[],
+) {
+    const {
+        View,
+        Text,
+    } = ReactNative;
 
-        const interval =
-            setInterval(
-                update,
-                1000,
-            );
-
-        return () => {
-            mounted = false;
-            clearInterval(interval);
-        };
-    }, [props.userId]);
-
-    const activityData =
+    const validActivities =
         activities
             .map((activity) => ({
                 activity,
                 buttons:
-                    normalizeButtons(
+                    getButtons(
                         activity,
                     ),
             }))
             .filter(
-                ({ buttons }) =>
-                    buttons.length > 0,
+                (entry) =>
+                    entry.buttons.length >
+                    0,
             );
 
     if (
-        activityData.length === 0
+        validActivities.length ===
+        0
     ) {
         return null;
     }
 
-    const { View, Text, TouchableOpacity } =
-        ReactNative;
+    return h(
+        View,
+        {
+            style: {
+                marginTop: 8,
+                padding: 12,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor:
+                    "#97979f0a",
+                backgroundColor:
+                    "#97979f14",
+            },
+        },
 
-    const elements: any[] = [];
-
-    for (
-        const {
-            activity,
-            buttons,
-        } of activityData
-    ) {
-        elements.push(
-            React.createElement(
-                View,
-                {
-                    key:
-                        activity.id ||
-                        activity.application_id ||
-                        Math.random(),
-                    style:
-                        styles.container,
-                },
-
-                React.createElement(
+        ...validActivities.map(
+            ({
+                activity,
+                buttons,
+            }, activityIndex) =>
+                h(
                     View,
                     {
-                        style:
-                            styles.header,
+                        key:
+                            activity.id ??
+                            activity.application_id ??
+                            activityIndex,
+                        style: {
+                            marginBottom:
+                                activityIndex ===
+                                validActivities.length -
+                                    1
+                                    ? 0
+                                    : 10,
+                        },
                     },
 
-                    React.createElement(
+                    h(
                         Text,
                         {
-                            style:
-                                styles.title,
+                            style: {
+                                color:
+                                    "#FFFFFF",
+                                fontSize: 15,
+                                fontWeight:
+                                    "600",
+                                marginBottom:
+                                    3,
+                            },
                             numberOfLines: 1,
                         },
-                        activity.name ||
+                        activity.name ??
                             "Rich Presence",
                     ),
 
                     activity.details ||
                     activity.state
-                        ? React.createElement(
+                        ? h(
                               Text,
                               {
-                                  style:
-                                      styles.subtitle,
+                                  style: {
+                                      color:
+                                          "#B5BAC1",
+                                      fontSize: 12,
+                                      marginBottom:
+                                          8,
+                                  },
                                   numberOfLines: 2,
                               },
                               [
@@ -340,76 +326,29 @@ function RichPresenceButtons(
                                   ),
                           )
                         : null,
-                ),
 
-                React.createElement(
-                    View,
-                    {
-                        style:
-                            styles.buttons,
-                    },
-                    ...buttons.map(
-                        (
-                            button,
-                            index,
-                        ) => {
-                            const hasUrl =
-                                Boolean(
-                                    button.url &&
-                                        /^https?:\/\//i.test(
-                                            button.url,
-                                        ),
-                                );
-
-                            return React.createElement(
-                                TouchableOpacity,
-                                {
-                                    key: `${button.label}-${index}`,
-                                    style: [
-                                        styles.button,
-                                        !hasUrl &&
-                                            styles.buttonDisabled,
-                                    ],
-                                    activeOpacity:
-                                        0.75,
-                                    onPress:
-                                        () => {
-                                            if (
-                                                !hasUrl
-                                            ) {
-                                                showToast(
-                                                    "This Rich Presence button has no URL",
-                                                );
-
-                                                return;
-                                            }
-
-                                            void openUrl(
-                                                button.url!,
-                                            );
-                                        },
-                                },
-                                React.createElement(
-                                    Text,
-                                    {
-                                        style:
-                                            styles.buttonText,
-                                        numberOfLines: 1,
-                                    },
-                                    button.label,
-                                ),
-                            );
+                    h(
+                        View,
+                        {
+                            style: {
+                                flexDirection:
+                                    "row",
+                                gap: 8,
+                            },
                         },
+                        ...buttons.map(
+                            (
+                                button,
+                                index,
+                            ) =>
+                                createButton(
+                                    button,
+                                    index,
+                                ),
+                        ),
                     ),
                 ),
-            ),
-        );
-    }
-
-    return React.createElement(
-        React.Fragment,
-        null,
-        ...elements,
+        ),
     );
 }
 
@@ -446,17 +385,15 @@ function getTypeName(
     return "Unknown";
 }
 
-function injectIntoTree(
+function inject(
     node: any,
-    depth = 0,
 ): {
     node: any;
     changed: boolean;
 } {
     if (
         !node ||
-        typeof node !== "object" ||
-        depth > 30
+        typeof node !== "object"
     ) {
         return {
             node,
@@ -464,12 +401,19 @@ function injectIntoTree(
         };
     }
 
+    const typeName =
+        getTypeName(node.type);
+
     if (
-        getTypeName(node.type) ===
+        typeName ===
         "UserProfileActivity"
     ) {
         const userId =
             node.props?.user?.id;
+
+        logger.log(
+            `[DBRP] Found UserProfileActivity user=${userId}`,
+        );
 
         if (!userId) {
             return {
@@ -478,31 +422,54 @@ function injectIntoTree(
             };
         }
 
-        const injected =
-            React.createElement(
-                React.Fragment,
-                {
-                    key:
-                        `dbrp-${userId}`,
-                },
-
-                node,
-
-                React.createElement(
-                    RichPresenceButtons,
-                    {
-                        userId,
-                    },
-                ),
+        const activities =
+            getActivities(
+                String(userId),
             );
 
+        logger.log(
+            `[DBRP] Activities: ${JSON.stringify(
+                activities,
+            )}`,
+        );
+
+        const presenceView =
+            createPresenceView(
+                activities,
+            );
+
+        if (!presenceView) {
+            logger.log(
+                "[DBRP] No activity buttons",
+            );
+
+            return {
+                node,
+                changed: false,
+            };
+        }
+
+        logger.log(
+            "[DBRP] Creating native Rich Presence button view",
+        );
+
         return {
-            node: injected,
+            node: h(
+                ReactNative.View,
+                {
+                    style: {
+                        width: "100%",
+                    },
+                },
+                node,
+                presenceView,
+            ),
             changed: true,
         };
     }
 
-    const props = node.props;
+    const props =
+        node.props;
 
     if (
         !props ||
@@ -524,11 +491,10 @@ function injectIntoTree(
 
         const nextChildren =
             children.map(
-                (child) => {
+                (child: any) => {
                     const result =
-                        injectIntoTree(
+                        inject(
                             child,
-                            depth + 1,
                         );
 
                     if (
@@ -567,10 +533,7 @@ function injectIntoTree(
             "object"
     ) {
         const result =
-            injectIntoTree(
-                children,
-                depth + 1,
-            );
+            inject(children);
 
         if (!result.changed) {
             return {
@@ -598,13 +561,13 @@ function injectIntoTree(
     };
 }
 
-export class DiscordBetterRichPresenceBar {
-    private unpatch: Unpatch | null =
-        null;
+class DiscordBetterRichPresenceBar {
+    private unpatch:
+        Unpatch | null = null;
 
     private started = false;
 
-    public start(): void {
+    start(): void {
         if (this.started) {
             return;
         }
@@ -612,55 +575,9 @@ export class DiscordBetterRichPresenceBar {
         this.started = true;
 
         logger.log(
-            "[DiscordBetterRichPresenceBar] Plugin loaded",
+            "[DBRP] Plugin loaded",
         );
 
-        try {
-            this.patchUserProfileContent();
-        } catch (error) {
-            this.started = false;
-
-            logger.error(
-                `[DiscordBetterRichPresenceBar] Failed to start: ${String(error)}`,
-            );
-        }
-    }
-
-    public stop(): void {
-        if (!this.started) {
-            return;
-        }
-
-        this.started = false;
-
-        logger.log(
-            "[DiscordBetterRichPresenceBar] Plugin unloading",
-        );
-
-        const unpatch =
-            this.unpatch;
-
-        this.unpatch = null;
-
-        if (
-            typeof unpatch ===
-            "function"
-        ) {
-            try {
-                unpatch();
-            } catch (error) {
-                logger.error(
-                    `[DiscordBetterRichPresenceBar] Failed to unpatch: ${String(error)}`,
-                );
-            }
-        }
-
-        logger.log(
-            "[DiscordBetterRichPresenceBar] Plugin unloaded",
-        );
-    }
-
-    private patchUserProfileContent(): void {
         const UserProfileContent =
             findByTypeName(
                 "UserProfileContent",
@@ -669,50 +586,76 @@ export class DiscordBetterRichPresenceBar {
         if (
             !UserProfileContent
         ) {
-            logger.log(
-                "[DiscordBetterRichPresenceBar] UserProfileContent not found",
+            logger.error(
+                "[DBRP] UserProfileContent not found",
             );
 
             return;
         }
 
         logger.log(
-            "[DiscordBetterRichPresenceBar] UserProfileContent found",
+            "[DBRP] UserProfileContent found",
         );
 
         this.unpatch = after(
             "type",
             UserProfileContent,
             (_args, result) => {
-                if (
-                    !result ||
-                    typeof result !==
-                        "object"
-                ) {
-                    return result;
-                }
+                try {
+                    const injected =
+                        inject(
+                            result,
+                        );
 
-                const injected =
-                    injectIntoTree(
-                        result,
+                    if (
+                        !injected.changed
+                    ) {
+                        return result;
+                    }
+
+                    logger.log(
+                        "[DBRP] Rich Presence buttons injected",
                     );
 
-                if (
-                    !injected.changed
-                ) {
+                    return injected.node;
+                } catch (error) {
+                    logger.error(
+                        `[DBRP] Injection failed: ${String(
+                            error,
+                        )}`,
+                    );
+
                     return result;
                 }
-
-                logger.log(
-                    "[DiscordBetterRichPresenceBar] Rich Presence buttons injected",
-                );
-
-                return injected.node;
             },
         );
 
         logger.log(
-            "[DiscordBetterRichPresenceBar] UserProfileContent patched",
+            "[DBRP] UserProfileContent patched",
+        );
+    }
+
+    stop(): void {
+        if (!this.started) {
+            return;
+        }
+
+        this.started = false;
+
+        try {
+            this.unpatch?.();
+        } catch (error) {
+            logger.error(
+                `[DBRP] Unpatch failed: ${String(
+                    error,
+                )}`,
+            );
+        }
+
+        this.unpatch = null;
+
+        logger.log(
+            "[DBRP] Plugin unloaded",
         );
     }
 }

@@ -1,67 +1,62 @@
 import { logger, metro, patcher } from "@vendetta";
 
 const targets = [
-    "DisplayProfile",
-    "UserProfileCard",
+    "PresenceActivityStatus",
     "ActivityStatus",
+    "ApplicationStreamActivityStatus",
+    "ActivityStatusText",
+    "ActivityStatusIcon",
 ];
 
 const patches: (() => void)[] = [];
 
-function inspectProps(name: string, props: any) {
-    try {
-        const result: any = {
-            keys: props ? Object.keys(props) : [],
-        };
+function simplify(value: any, depth = 0): any {
+    if (depth > 4) return "[MaxDepth]";
 
-        if (props) {
-            for (const key of [
-                "user",
-                "userId",
-                "profile",
-                "activities",
-                "activity",
-                "presence",
-                "displayProfile",
-                "selectedActivity",
-            ]) {
-                if (key in props) {
-                    result[key] = props[key];
-                }
+    if (value === null || value === undefined) {
+        return value;
+    }
+
+    if (
+        typeof value === "string" ||
+        typeof value === "number" ||
+        typeof value === "boolean"
+    ) {
+        return value;
+    }
+
+    if (typeof value === "function") {
+        return `[Function ${value.name || "anonymous"}]`;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => simplify(item, depth + 1));
+    }
+
+    if (typeof value === "object") {
+        const result: Record<string, any> = {};
+
+        for (const key of Object.keys(value)) {
+            try {
+                result[key] = simplify(value[key], depth + 1);
+            } catch {
+                result[key] = "[Unreadable]";
             }
         }
 
-        logger.log(
-            `[DiscordBetterRichPresenceBar] ${name} PROPS:`,
-            result,
-        );
-    } catch (error) {
-        logger.error(
-            `[DiscordBetterRichPresenceBar] ${name} inspect failed`,
-            error,
-        );
+        return result;
     }
+
+    return `[${typeof value}]`;
 }
 
 function patchFunction(name: string) {
     try {
         const module = metro.findByName(name, false);
 
-        if (!module) {
+        if (!module || typeof module.default !== "function") {
             logger.log(
-                `[DiscordBetterRichPresenceBar] ${name}: raw module NOT FOUND`,
-            );
-            return;
-        }
-
-        logger.log(
-            `[DiscordBetterRichPresenceBar] ${name} raw module keys:`,
-            Object.keys(module),
-        );
-
-        if (typeof module.default !== "function") {
-            logger.log(
-                `[DiscordBetterRichPresenceBar] ${name}: default export is not a function`,
+                `[DiscordBetterRichPresenceBar] ${name}: unavailable`,
             );
             return;
         }
@@ -69,8 +64,18 @@ function patchFunction(name: string) {
         const unpatch = patcher.before(
             "default",
             module,
-            (_args: any[]) => {
-                inspectProps(name, _args?.[0]);
+            (args: any[]) => {
+                try {
+                    logger.log(
+                        `[DiscordBetterRichPresenceBar] ${name} PROPS:`,
+                        simplify(args?.[0]),
+                    );
+                } catch (error) {
+                    logger.error(
+                        `[DiscordBetterRichPresenceBar] ${name} logger failed`,
+                        error,
+                    );
+                }
             },
         );
 
@@ -81,7 +86,7 @@ function patchFunction(name: string) {
         );
     } catch (error) {
         logger.error(
-            `[DiscordBetterRichPresenceBar] ${name} patch failed`,
+            `[DiscordBetterRichPresenceBar] ${name}: patch failed`,
             error,
         );
     }
@@ -93,7 +98,7 @@ function start() {
     }
 
     logger.log(
-        "[DiscordBetterRichPresenceBar] Props diagnostic loaded",
+        "[DiscordBetterRichPresenceBar] Activity diagnostic loaded",
     );
 }
 
@@ -105,7 +110,7 @@ function stop() {
     }
 
     logger.log(
-        "[DiscordBetterRichPresenceBar] Props diagnostic unloaded",
+        "[DiscordBetterRichPresenceBar] Activity diagnostic unloaded",
     );
 }
 

@@ -1,57 +1,69 @@
 import { logger, metro } from "@vendetta";
 
-const names = [
-    "USER_PROFILE_ACTIVITY_BUTTONS",
-    "USER_PROFILE_LIVE_ACTIVITY_CARD",
-    "USER_PROFILE_RECENT_ACTIVITY_CARD",
-    "NOW_PLAYING_ITEM_RICH_PRESENCE_SECTION",
-];
+export default {
+  onLoad() {
+    try {
+      const userId = "1459041073136402453";
 
-function start() {
-    for (const name of names) {
+      const stores = [
+        ["getActivities", metro.findByProps("getActivities")],
+        ["getActivity", metro.findByProps("getActivity")],
+        ["getStatus", metro.findByProps("getStatus")],
+        ["getStreamerActivityByUserId", metro.findByProps("getStreamerActivityByUserId")],
+      ];
+
+      for (const [name, store] of stores) {
+        if (!store) {
+          logger.log(`[ACTIVITY STORE] ${name}: NOT FOUND`);
+          continue;
+        }
+
+        logger.log(`[ACTIVITY STORE] ${name}: FOUND`);
+        logger.log(
+          `[ACTIVITY STORE] ${name} keys: ${JSON.stringify(
+            Object.keys(store),
+          )}`,
+        );
+
+        const proto = Object.getPrototypeOf(store);
+
+        if (proto) {
+          logger.log(
+            `[ACTIVITY STORE] ${name} prototype: ${JSON.stringify(
+              Object.getOwnPropertyNames(proto),
+            )}`,
+          );
+        }
+
         try {
-            const modules = metro.findAll((module: any) => {
-                try {
-                    return Object.prototype.hasOwnProperty.call(
-                        module,
-                        name,
-                    );
-                } catch {
-                    return false;
-                }
-            });
+          const fn = store[name];
+
+          logger.log(
+            `[ACTIVITY STORE] ${name} typeof: ${typeof fn}`,
+          );
+
+          if (typeof fn === "function") {
+            const result = fn.call(store, userId);
 
             logger.log(
-                `[DiscordBetterRichPresenceBar] ${name}: ${modules.length} matches`,
+              `[ACTIVITY STORE] ${name} result: ${JSON.stringify(
+                result,
+                (_, value) => {
+                  if (typeof value === "bigint") return value.toString();
+                  if (typeof value === "function") return "[Function]";
+                  return value;
+                },
+              )}`,
             );
-
-            for (const module of modules) {
-                logger.log(
-                    `[DiscordBetterRichPresenceBar] ${name} MODULE:`,
-                    {
-                        moduleName: module?.name,
-                        displayName: module?.displayName,
-                        keys: Object.keys(module),
-                        target: module?.[name],
-                    },
-                );
-            }
+          }
         } catch (error) {
-            logger.error(
-                `[DiscordBetterRichPresenceBar] ${name} scan failed`,
-                error,
-            );
+          logger.error(
+            `[ACTIVITY STORE] ${name} invocation failed: ${String(error)}`,
+          );
         }
+      }
+    } catch (error) {
+      logger.error(`[ACTIVITY STORE] FATAL: ${String(error)}`);
     }
-}
-
-function stop() {
-    logger.log(
-        "[DiscordBetterRichPresenceBar] Profile activity scan stopped",
-    );
-}
-
-export default {
-    start,
-    stop,
+  },
 };

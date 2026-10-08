@@ -23,10 +23,10 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: "11.28.5"
+          version: "11.28.4"
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
 
       - name: Build plugin(s)
         run: node ./plugins/build.mjs

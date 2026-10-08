@@ -1,52 +1,111 @@
-import { logger, metro } from "@vendetta";
+import { logger, metro, patcher } from "@vendetta";
 
-function inspectComponent(name: string) {
-    const component = metro.findByName(name);
+const targets = [
+    "DisplayProfile",
+    "UserProfileCard",
+    "ActivityStatus",
+];
 
-    if (!component) {
-        logger.log(
-            `[DiscordBetterRichPresenceBar] ${name}: NOT FOUND`,
-        );
-        return;
-    }
+const patches: (() => void)[] = [];
 
-    logger.log(
-        `[DiscordBetterRichPresenceBar] ${name}: FOUND`,
-    );
-
-    logger.log(
-        `[DiscordBetterRichPresenceBar] ${name} keys:`,
-        Object.keys(component),
-    );
-
-    logger.log(
-        `[DiscordBetterRichPresenceBar] ${name} source:`,
-        Function.prototype.toString
-            .call(component)
-            .slice(0, 4000),
-    );
-}
-
-function start() {
+function inspectProps(name: string, props: any) {
     try {
-        inspectComponent("DisplayProfile");
-        inspectComponent("UserProfileCard");
-        inspectComponent("ActivityStatus");
+        const result: any = {
+            keys: props ? Object.keys(props) : [],
+        };
+
+        if (props) {
+            for (const key of [
+                "user",
+                "userId",
+                "profile",
+                "activities",
+                "activity",
+                "presence",
+                "displayProfile",
+                "selectedActivity",
+            ]) {
+                if (key in props) {
+                    result[key] = props[key];
+                }
+            }
+        }
 
         logger.log(
-            "[DiscordBetterRichPresenceBar] Diagnostic loaded",
+            `[DiscordBetterRichPresenceBar] ${name} PROPS:`,
+            result,
         );
     } catch (error) {
         logger.error(
-            "[DiscordBetterRichPresenceBar] Diagnostic failed",
+            `[DiscordBetterRichPresenceBar] ${name} inspect failed`,
             error,
         );
     }
 }
 
-function stop() {
+function patchFunction(name: string) {
+    try {
+        const module = metro.findByName(name, false);
+
+        if (!module) {
+            logger.log(
+                `[DiscordBetterRichPresenceBar] ${name}: raw module NOT FOUND`,
+            );
+            return;
+        }
+
+        logger.log(
+            `[DiscordBetterRichPresenceBar] ${name} raw module keys:`,
+            Object.keys(module),
+        );
+
+        if (typeof module.default !== "function") {
+            logger.log(
+                `[DiscordBetterRichPresenceBar] ${name}: default export is not a function`,
+            );
+            return;
+        }
+
+        const unpatch = patcher.before(
+            "default",
+            module,
+            (_args: any[]) => {
+                inspectProps(name, _args?.[0]);
+            },
+        );
+
+        patches.push(unpatch);
+
+        logger.log(
+            `[DiscordBetterRichPresenceBar] ${name}: patched`,
+        );
+    } catch (error) {
+        logger.error(
+            `[DiscordBetterRichPresenceBar] ${name} patch failed`,
+            error,
+        );
+    }
+}
+
+function start() {
+    for (const target of targets) {
+        patchFunction(target);
+    }
+
     logger.log(
-        "[DiscordBetterRichPresenceBar] Diagnostic unloaded",
+        "[DiscordBetterRichPresenceBar] Props diagnostic loaded",
+    );
+}
+
+function stop() {
+    for (const unpatch of patches.splice(0)) {
+        try {
+            unpatch();
+        } catch {}
+    }
+
+    logger.log(
+        "[DiscordBetterRichPresenceBar] Props diagnostic unloaded",
     );
 }
 

@@ -3,10 +3,13 @@ import { findByTypeName } from "@vendetta/metro";
 
 type Unpatch = () => unknown;
 
+interface InspectState {
+    count: number;
+}
+
 export class DiscordBetterRichPresenceBar {
     private unpatch: Unpatch | null = null;
     private started = false;
-    private loggedResults = new WeakSet<object>();
 
     public start(): void {
         if (this.started) {
@@ -21,7 +24,11 @@ export class DiscordBetterRichPresenceBar {
             this.patchUserProfileContent();
         } catch (error) {
             this.started = false;
-            console.error("[DBRP] Failed to start:", error);
+
+            console.error(
+                "[DBRP] Failed to start:",
+                error,
+            );
         }
     }
 
@@ -37,43 +44,57 @@ export class DiscordBetterRichPresenceBar {
         try {
             this.unpatch?.();
         } catch (error) {
-            console.error("[DBRP] Failed to unpatch:", error);
+            console.error(
+                "[DBRP] Failed to unpatch:",
+                error,
+            );
         } finally {
             this.unpatch = null;
-            this.loggedResults = new WeakSet<object>();
         }
 
         console.log("[DBRP] Stopped");
     }
 
     private patchUserProfileContent(): void {
-        const UserProfileContent = findByTypeName("UserProfileContent");
+        const UserProfileContent =
+            findByTypeName("UserProfileContent");
 
         if (!UserProfileContent) {
-            console.log("[DBRP] UserProfileContent not found");
+            console.log(
+                "[DBRP] UserProfileContent not found",
+            );
+
             return;
         }
 
-        console.log("[DBRP] UserProfileContent found");
+        console.log(
+            "[DBRP] UserProfileContent found",
+            UserProfileContent,
+        );
 
-        this.unpatch = after(
+        const loggedResults = new WeakSet<object>();
+        const inspectTree = this.inspectTree.bind(this);
+
+        const unpatch = after(
             "type",
             UserProfileContent,
             (_args, result) => {
                 if (
                     !result ||
                     typeof result !== "object" ||
-                    this.loggedResults.has(result)
+                    loggedResults.has(result)
                 ) {
                     return;
                 }
 
-                this.loggedResults.add(result);
+                loggedResults.add(result);
 
                 const lines: string[] = [];
-                const state = { count: 0 };
+                const state: InspectState = {
+                    count: 0,
+                };
 
-                this.inspectTree(
+                inspectTree(
                     result,
                     lines,
                     state,
@@ -85,13 +106,17 @@ export class DiscordBetterRichPresenceBar {
             },
         );
 
-        console.log("[DBRP] UserProfileContent patched");
+        this.unpatch = unpatch;
+
+        console.log(
+            "[DBRP] UserProfileContent patched",
+        );
     }
 
     private inspectTree(
         node: any,
         lines: string[],
-        state: { count: number },
+        state: InspectState,
         depth = 0,
         maxDepth = 12,
     ): void {
@@ -118,7 +143,8 @@ export class DiscordBetterRichPresenceBar {
                         : "Unknown";
 
         const props =
-            node.props && typeof node.props === "object"
+            node.props &&
+            typeof node.props === "object"
                 ? node.props
                 : null;
 

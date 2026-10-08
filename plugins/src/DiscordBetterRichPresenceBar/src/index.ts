@@ -1,6 +1,6 @@
 import DiscordBetterRichPresenceBar from "./DiscordBetterRichPresenceBar";
 
-export default {
+export default { //hehe
     onLoad() {
         console.log("[DBRP] ONLOAD");
         DiscordBetterRichPresenceBar.start();

@@ -1,5 +1,4 @@
-import { patcher, logger } from "@vendetta";
-import { findByName } from "@metro/common";
+import { logger, metro, patcher } from "@vendetta";
 
 type ActivityButton = {
     label?: string;
@@ -26,191 +25,118 @@ type ReactElement = {
     key?: string | null;
 };
 
-type Runtime = {
-    React: typeof React;
-    ReactNative: typeof import("react-native");
-};
-
 const patches: (() => unknown)[] = [];
 
-const getUserStore = () => {
-    const UserStore = findByName("UserStore");
+function getUserStore() {
+    return metro.findByName("UserStore");
+}
 
-    if (!UserStore) {
-        throw new Error("UserStore not found");
-    }
+function getCurrentUserId(): string | undefined {
+    const UserStore = getUserStore();
 
-    return UserStore;
-};
+    return UserStore?.getCurrentUser?.()?.id;
+}
 
-const getCurrentUserId = (): string | undefined => {
-    try {
-        return getUserStore()
-            .getCurrentUser?.()
-            ?.id;
-    } catch {
-        return undefined;
-    }
-};
+function normalizeUrl(url: unknown): string | null {
+    if (typeof url !== "string") return null;
 
-const normalizeUrl = (
-    value: unknown
-): string | undefined => {
-    if (typeof value !== "string") {
-        return undefined;
-    }
+    const value = url.trim();
 
-    const url = value.trim();
+    return /^https?:\/\//i.test(value) ? value : null;
+}
 
-    if (!/^https?:\/\//i.test(url)) {
-        return undefined;
-    }
+function getActivityButtons(activity?: Activity): ActivityButton[] {
+    if (!activity) return [];
 
-    return url;
-};
+    const result: ActivityButton[] = [];
 
-const getActivityButtons = (
-    activity: Activity | undefined
-): { label: string; url: string }[] => {
-    if (!activity?.buttons?.length) {
-        return [];
-    }
+    if (Array.isArray(activity.buttons)) {
+        for (const button of activity.buttons) {
+            if (typeof button === "string") {
+                const url = normalizeUrl(button);
 
-    const urls =
-        activity.metadata?.button_urls ?? [];
+                if (url) {
+                    result.push({ label: "Open", url });
+                }
+            } else {
+                const url = normalizeUrl(button?.url);
 
-    return activity.buttons
-        .slice(0, 2)
-        .map((button, index) => {
-            const label =
-                typeof button === "string"
-                    ? button.trim()
-                    : button?.label?.trim();
-
-            const url =
-                typeof button === "string"
-                    ? normalizeUrl(urls[index])
-                    : normalizeUrl(
-                          button?.url ??
-                              urls[index]
-                      );
-
-            if (!label || !url) {
-                return undefined;
+                if (url) {
+                    result.push({
+                        label: button.label?.trim() || "Open",
+                        url,
+                    });
+                }
             }
-
-            return {
-                label,
-                url,
-            };
-        })
-        .filter(
-            (
-                button
-            ): button is {
-                label: string;
-                url: string;
-            } => Boolean(button)
-        );
-};
-
-const openUrl = async (
-    url: string
-): Promise<void> => {
-    try {
-        const urlModule =
-            findByName("url");
-
-        if (urlModule?.openURL) {
-            await urlModule.openURL(url);
-            return;
         }
-    } catch {}
-
-    try {
-        if (
-            typeof window !== "undefined" &&
-            typeof window.open === "function"
-        ) {
-            window.open(url);
-        }
-    } catch (error) {
-        logger.error(
-            "[DiscordBetterRichPresenceBar] Failed to open URL",
-            error
-        );
     }
-};
 
-const createButton = (
-    runtime: Runtime,
-    label: string,
-    url: string,
-    index: number
-) => {
-    const {
-        React,
-        ReactNative,
-    } = runtime;
+    if (Array.isArray(activity.metadata?.button_urls)) {
+        for (const value of activity.metadata.button_urls) {
+            const url = normalizeUrl(value);
 
-    const Button = findByName("Button");
+            if (url) {
+                result.push({
+                    label: "Open",
+                    url,
+                });
+            }
+        }
+    }
 
-    if (Button) {
-        return React.createElement(Button, {
-            key: `rich-presence-button-${index}`,
-            text: label,
-            size: "sm",
-            variant: "secondary",
-            onPress: () => {
-                void openUrl(url);
-            },
-            style: {
-                marginRight:
-                    index === 0 ? 8 : 0,
-                marginBottom: 8,
-            },
-        });
+    return result.slice(0, 2);
+}
+
+async function openUrl(url: string) {
+    const openURL = metro.common.url?.openURL;
+
+    if (typeof openURL === "function") {
+        await openURL(url);
+        return;
+    }
+
+    if (typeof window?.open === "function") {
+        window.open(url);
+    }
+}
+
+function createButton(button: ActivityButton, React: typeof import("react")) {
+    const ReactNative = metro.common.ReactNative;
+
+    if (!ReactNative?.Pressable || !ReactNative?.Text) {
+        return null;
     }
 
     return React.createElement(
         ReactNative.Pressable,
         {
-            key: `rich-presence-button-${index}`,
-            onPress: () => {
-                void openUrl(url);
-            },
+            key: button.url,
+            onPress: () => openUrl(button.url!),
             style: {
                 paddingHorizontal: 12,
                 paddingVertical: 8,
-                marginRight:
-                    index === 0 ? 8 : 0,
-                marginBottom: 8,
                 borderRadius: 6,
+                marginRight: 8,
+                marginTop: 8,
             },
         },
         React.createElement(
             ReactNative.Text,
             null,
-            label
-        )
+            button.label || "Open",
+        ),
     );
-};
+}
 
-const createButtons = (
-    runtime: Runtime,
-    activity: Activity
-) => {
-    const buttons =
-        getActivityButtons(activity);
+function createButtons(
+    buttons: ActivityButton[],
+    React: typeof import("react"),
+) {
+    const ReactNative = metro.common.ReactNative;
 
-    if (!buttons.length) {
+    if (!ReactNative?.View) {
         return null;
     }
-
-    const {
-        React,
-        ReactNative,
-    } = runtime;
 
     return React.createElement(
         ReactNative.View,
@@ -218,146 +144,87 @@ const createButtons = (
             style: {
                 flexDirection: "row",
                 flexWrap: "wrap",
-                marginTop: 8,
+                alignItems: "center",
             },
         },
-        buttons.map(
-            ({ label, url }, index) =>
-                createButton(
-                    runtime,
-                    label,
-                    url,
-                    index
-                )
-        )
+        buttons.map(button => createButton(button, React)),
     );
-};
+}
 
-const patchActivityContainer = () => {
-    const ActivityContainer =
-        findByName(
-            "UserActivityContainer"
-        );
+function patchActivityContainer() {
+    const ActivityContainer = metro.findByName("UserActivityContainer");
 
-    if (!ActivityContainer) {
-        throw new Error(
-            "UserActivityContainer not found"
-        );
+    if (!ActivityContainer?.prototype?.render) {
+        throw new Error("UserActivityContainer.render not found");
     }
 
-    const runtime: Runtime = {
-        React,
-        ReactNative:
-            require("react-native"),
-    };
+    const React = metro.common.React;
 
     const unpatch = patcher.after(
         "render",
         ActivityContainer.prototype,
         function (
-            _: unknown,
-            result: ReactElement
+            this: { props?: ActivityProps },
+            result: ReactElement,
         ) {
-            const props =
-                this?.props as
-                    | ActivityProps
-                    | undefined;
+            const currentUserId = getCurrentUserId();
+            const userId = this.props?.user?.id;
 
-            if (!props?.activity) {
+            if (!currentUserId || !userId || currentUserId !== userId) {
                 return result;
             }
 
-            const currentUserId =
-                getCurrentUserId();
+            const buttons = getActivityButtons(this.props?.activity);
 
-            if (
-                !currentUserId ||
-                props.user?.id !==
-                    currentUserId
-            ) {
+            if (buttons.length === 0 || !result?.props) {
                 return result;
             }
 
-            const buttons =
-                createButtons(
-                    runtime,
-                    props.activity
-                );
+            const buttonBar = createButtons(buttons, React);
 
-            if (!buttons) {
+            if (!buttonBar) {
                 return result;
             }
 
-            if (
-                !result ||
-                typeof result !==
-                    "object" ||
-                !result.props
-            ) {
-                return result;
+            const children = result.props.children;
+
+            if (Array.isArray(children)) {
+                result.props.children = [...children, buttonBar];
+            } else {
+                result.props.children = [
+                    children,
+                    buttonBar,
+                ];
             }
 
-            const children =
-                result.props.children;
-
-            return {
-                ...result,
-                props: {
-                    ...result.props,
-                    children:
-                        Array.isArray(children)
-                            ? [
-                                  ...children,
-                                  buttons,
-                              ]
-                            : [
-                                  children,
-                                  buttons,
-                              ],
-                },
-            };
-        }
+            return result;
+        },
     );
 
     patches.push(unpatch);
-};
+}
 
 const start = () => {
-    if (patches.length > 0) {
-        return;
-    }
+    if (patches.length > 0) return;
 
     try {
         patchActivityContainer();
-
-        logger.log(
-            "[DiscordBetterRichPresenceBar] Loaded"
-        );
+        logger.log("[DiscordBetterRichPresenceBar] Loaded");
     } catch (error) {
-        logger.error(
-            "[DiscordBetterRichPresenceBar] Failed to load",
-            error
-        );
+        logger.error("[DiscordBetterRichPresenceBar] Failed to load", error);
     }
 };
 
 const stop = () => {
-    for (
-        const unpatch of patches.splice(0)
-    ) {
+    for (const unpatch of patches.splice(0)) {
         try {
             unpatch();
         } catch (error) {
-            logger.error(
-                "[DiscordBetterRichPresenceBar] Failed to unpatch",
-                error
-            );
+            logger.error("[DiscordBetterRichPresenceBar] Failed to unpatch", error);
         }
     }
 
-    logger.log(
-        "[DiscordBetterRichPresenceBar] Unloaded"
-    );
+    logger.log("[DiscordBetterRichPresenceBar] Unloaded");
 };
 
 export default {

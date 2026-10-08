@@ -3,7 +3,7 @@ import { findByTypeName } from "@vendetta/metro";
 
 type Unpatch = () => unknown;
 
-export default class DiscordBetterRichPresenceBar {
+export class DiscordBetterRichPresenceBar {
     private unpatch: Unpatch | null = null;
     private started = false;
     private loggedResults = new WeakSet<object>();
@@ -56,8 +56,6 @@ export default class DiscordBetterRichPresenceBar {
 
         console.log("[DBRP] UserProfileContent found");
 
-        const instance = this;
-
         this.unpatch = after(
             "type",
             UserProfileContent,
@@ -65,18 +63,24 @@ export default class DiscordBetterRichPresenceBar {
                 if (
                     !result ||
                     typeof result !== "object" ||
-                    instance.loggedResults.has(result)
+                    this.loggedResults.has(result)
                 ) {
                     return;
                 }
 
-                instance.loggedResults.add(result);
+                this.loggedResults.add(result);
 
                 const lines: string[] = [];
-                instance.inspectTree(result, lines);
+                const state = { count: 0 };
+
+                this.inspectTree(
+                    result,
+                    lines,
+                    state,
+                );
 
                 console.log(
-                    `[DBRP] UserProfileContent tree:\n${lines.join("\n")}`,
+                    `[DBRP] UserProfileContent tree (${state.count} nodes):\n${lines.join("\n")}`,
                 );
             },
         );
@@ -87,13 +91,14 @@ export default class DiscordBetterRichPresenceBar {
     private inspectTree(
         node: any,
         lines: string[],
+        state: { count: number },
         depth = 0,
-        state = { count: 0 },
+        maxDepth = 12,
     ): void {
         if (
             !node ||
             typeof node !== "object" ||
-            depth > 12 ||
+            depth > maxDepth ||
             state.count >= 500
         ) {
             return;
@@ -132,8 +137,9 @@ export default class DiscordBetterRichPresenceBar {
                 this.inspectTree(
                     child,
                     lines,
-                    depth + 1,
                     state,
+                    depth + 1,
+                    maxDepth,
                 );
             }
 
@@ -143,8 +149,11 @@ export default class DiscordBetterRichPresenceBar {
         this.inspectTree(
             children,
             lines,
-            depth + 1,
             state,
+            depth + 1,
+            maxDepth,
         );
     }
-    }
+}
+
+export default new DiscordBetterRichPresenceBar();

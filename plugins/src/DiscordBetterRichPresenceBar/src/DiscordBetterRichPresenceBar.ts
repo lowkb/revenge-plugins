@@ -1,63 +1,54 @@
 import { logger, metro } from "@vendetta";
 
-function inspectModules() {
-    const matches = metro.findAll(
-        (module: any) => {
-            const displayName =
-                typeof module?.displayName === "string"
-                    ? module.displayName
-                    : "";
+function inspectComponent(name: string) {
+    const component = metro.findByName(name);
 
-            const name =
-                typeof module?.name === "string"
-                    ? module.name
-                    : "";
+    if (!component) {
+        logger.log(
+            `[DiscordBetterRichPresenceBar] ${name}: NOT FOUND`,
+        );
+        return;
+    }
 
-            const text = `${displayName} ${name}`.toLowerCase();
-
-            return (
-                text.includes("activity") ||
-                text.includes("presence") ||
-                text.includes("profile") ||
-                text.includes("user")
-            );
-        },
+    logger.log(
+        `[DiscordBetterRichPresenceBar] ${name}: FOUND`,
     );
 
     logger.log(
-        `[DiscordBetterRichPresenceBar] Found ${matches.length} candidate modules`,
+        `[DiscordBetterRichPresenceBar] ${name} keys:`,
+        Object.keys(component),
     );
 
-    for (const module of matches.slice(0, 100)) {
-        try {
-            logger.log(
-                "[DiscordBetterRichPresenceBar] Candidate:",
-                {
-                    displayName: module?.displayName,
-                    name: module?.name,
-                    type: typeof module,
-                },
-            );
-        } catch {
-        }
-    }
+    logger.log(
+        `[DiscordBetterRichPresenceBar] ${name} source:`,
+        Function.prototype.toString
+            .call(component)
+            .slice(0, 4000),
+    );
 }
 
-const start = () => {
+function start() {
     try {
-        inspectModules();
-        logger.log("[DiscordBetterRichPresenceBar] Diagnostic loaded");
+        inspectComponent("DisplayProfile");
+        inspectComponent("UserProfileCard");
+        inspectComponent("ActivityStatus");
+
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Diagnostic loaded",
+        );
     } catch (error) {
         logger.error(
             "[DiscordBetterRichPresenceBar] Diagnostic failed",
             error,
         );
     }
-};
+}
 
-const stop = () => {
-    logger.log("[DiscordBetterRichPresenceBar] Diagnostic unloaded");
-};
+function stop() {
+    logger.log(
+        "[DiscordBetterRichPresenceBar] Diagnostic unloaded",
+    );
+}
 
 export default {
     start,

@@ -1,3 +1,4 @@
+import { logger } from "@vendetta";
 import { after } from "@vendetta/patcher";
 import { findByTypeName } from "@vendetta/metro";
 
@@ -18,16 +19,17 @@ export class DiscordBetterRichPresenceBar {
 
         this.started = true;
 
-        console.log("[DBRP] Starting");
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin loaded",
+        );
 
         try {
             this.patchUserProfileContent();
         } catch (error) {
             this.started = false;
 
-            console.error(
-                "[DBRP] Failed to start:",
-                error,
+            logger.error(
+                `[DiscordBetterRichPresenceBar] Failed to start: ${String(error)}`,
             );
         }
     }
@@ -39,20 +41,22 @@ export class DiscordBetterRichPresenceBar {
 
         this.started = false;
 
-        console.log("[DBRP] Stopping");
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin unloading",
+        );
 
-        try {
-            this.unpatch?.();
-        } catch (error) {
-            console.error(
-                "[DBRP] Failed to unpatch:",
-                error,
-            );
-        } finally {
-            this.unpatch = null;
+        const unpatch = this.unpatch;
+        this.unpatch = null;
+
+        if (typeof unpatch === "function") {
+            try {
+                unpatch();
+            } catch (error) {
+                logger.error(
+                    `[DiscordBetterRichPresenceBar] Failed to unpatch: ${String(error)}`,
+                );
+            }
         }
-
-        console.log("[DBRP] Stopped");
     }
 
     private patchUserProfileContent(): void {
@@ -60,34 +64,29 @@ export class DiscordBetterRichPresenceBar {
             findByTypeName("UserProfileContent");
 
         if (!UserProfileContent) {
-            console.log(
-                "[DBRP] UserProfileContent not found",
+            logger.log(
+                "[DiscordBetterRichPresenceBar] UserProfileContent not found",
             );
 
             return;
         }
 
-        console.log(
-            "[DBRP] UserProfileContent found",
-            UserProfileContent,
+        logger.log(
+            "[DiscordBetterRichPresenceBar] UserProfileContent found",
         );
 
-        const loggedResults = new WeakSet<object>();
         const inspectTree = this.inspectTree.bind(this);
 
-        const unpatch = after(
+        this.unpatch = after(
             "type",
             UserProfileContent,
             (_args, result) => {
                 if (
                     !result ||
-                    typeof result !== "object" ||
-                    loggedResults.has(result)
+                    typeof result !== "object"
                 ) {
                     return;
                 }
-
-                loggedResults.add(result);
 
                 const lines: string[] = [];
                 const state: InspectState = {
@@ -100,16 +99,14 @@ export class DiscordBetterRichPresenceBar {
                     state,
                 );
 
-                console.log(
-                    `[DBRP] UserProfileContent tree (${state.count} nodes):\n${lines.join("\n")}`,
+                logger.log(
+                    `[DiscordBetterRichPresenceBar] UserProfileContent tree (${state.count} nodes):\n${lines.join("\n")}`,
                 );
             },
         );
 
-        this.unpatch = unpatch;
-
-        console.log(
-            "[DBRP] UserProfileContent patched",
+        logger.log(
+            "[DiscordBetterRichPresenceBar] UserProfileContent patched",
         );
     }
 
@@ -137,9 +134,14 @@ export class DiscordBetterRichPresenceBar {
             typeof type === "string"
                 ? type
                 : typeof type === "function"
-                    ? type.displayName || type.name || "Anonymous"
-                    : type && typeof type === "object"
-                        ? type.displayName || type.name || "Object"
+                    ? type.displayName ||
+                      type.name ||
+                      "Anonymous"
+                    : type &&
+                        typeof type === "object"
+                        ? type.displayName ||
+                          type.name ||
+                          "Object"
                         : "Unknown";
 
         const props =
@@ -160,7 +162,7 @@ export class DiscordBetterRichPresenceBar {
 
         if (Array.isArray(children)) {
             for (const child of children) {
-                this.inspectTree(
+                inspectTree(
                     child,
                     lines,
                     state,
@@ -172,7 +174,7 @@ export class DiscordBetterRichPresenceBar {
             return;
         }
 
-        this.inspectTree(
+        inspectTree(
             children,
             lines,
             state,

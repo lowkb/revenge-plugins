@@ -1,105 +1,53 @@
 import { logger, metro } from "@vendetta";
 
-const getterNames = [
-    "getActivities",
-    "getActivity",
-    "getActivitiesForUser",
-    "getUserActivities",
-    "getCurrentUserActivities",
-    "getPresence",
-    "getPresenceForUser",
-    "getPresenceStatus",
-    "getStatus",
+const names = [
+    "USER_PROFILE_ACTIVITY_BUTTONS",
+    "USER_PROFILE_LIVE_ACTIVITY_CARD",
+    "USER_PROFILE_RECENT_ACTIVITY_CARD",
+    "NOW_PLAYING_ITEM_RICH_PRESENCE_SECTION",
 ];
 
-function inspectGetter(name: string) {
-    try {
-        const module = metro.findByProps(name);
-
-        if (!module) {
-            return;
-        }
-
-        logger.log(
-            `[DiscordBetterRichPresenceBar] FOUND ${name}:`,
-            {
-                keys: Object.keys(module),
-                functions: Object.keys(module).filter(
-                    (key) => typeof module[key] === "function",
-                ),
-            },
-        );
-    } catch (error) {
-        logger.error(
-            `[DiscordBetterRichPresenceBar] ${name} failed`,
-            error,
-        );
-    }
-}
-
-function scanActivityModules() {
-    try {
-        const modules = metro.findAll((module: any) => {
-            const keys = Object.keys(module);
-
-            return keys.some((key) =>
-                /activity|activities|presence/i.test(key),
-            );
-        });
-
-        logger.log(
-            `[DiscordBetterRichPresenceBar] Activity-related modules: ${modules.length}`,
-        );
-
-        for (const module of modules.slice(0, 100)) {
-            try {
-                const keys = Object.keys(module);
-
-                const interesting = keys.filter((key) =>
-                    /activity|activities|presence/i.test(key),
-                );
-
-                if (interesting.length === 0) {
-                    continue;
+function start() {
+    for (const name of names) {
+        try {
+            const modules = metro.findAll((module: any) => {
+                try {
+                    return Object.prototype.hasOwnProperty.call(
+                        module,
+                        name,
+                    );
+                } catch {
+                    return false;
                 }
+            });
 
+            logger.log(
+                `[DiscordBetterRichPresenceBar] ${name}: ${modules.length} matches`,
+            );
+
+            for (const module of modules) {
                 logger.log(
-                    `[DiscordBetterRichPresenceBar] MODULE:`,
+                    `[DiscordBetterRichPresenceBar] ${name} MODULE:`,
                     {
-                        name: module.name,
-                        displayName: module.displayName,
-                        interesting,
-                        functions: interesting.filter(
-                            (key) =>
-                                typeof module[key] === "function",
-                        ),
+                        moduleName: module?.name,
+                        displayName: module?.displayName,
+                        keys: Object.keys(module),
+                        target: module?.[name],
                     },
                 );
-            } catch {}
+            }
+        } catch (error) {
+            logger.error(
+                `[DiscordBetterRichPresenceBar] ${name} scan failed`,
+                error,
+            );
         }
-    } catch (error) {
-        logger.error(
-            "[DiscordBetterRichPresenceBar] module scan failed",
-            error,
-        );
     }
-}
-
-function start() {
-    logger.log(
-        "[DiscordBetterRichPresenceBar] Store diagnostic started",
-    );
-
-    for (const name of getterNames) {
-        inspectGetter(name);
-    }
-
-    scanActivityModules();
 }
 
 function stop() {
     logger.log(
-        "[DiscordBetterRichPresenceBar] Store diagnostic stopped",
+        "[DiscordBetterRichPresenceBar] Profile activity scan stopped",
     );
 }
 

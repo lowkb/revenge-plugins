@@ -1,69 +1,103 @@
 import { logger, metro } from "@vendetta";
 
-export default {
-  onLoad() {
-    try {
-      const userId = "1459041073136402453";
-
-      const stores = [
-        ["getActivities", metro.findByProps("getActivities")],
-        ["getActivity", metro.findByProps("getActivity")],
-        ["getStatus", metro.findByProps("getStatus")],
-        ["getStreamerActivityByUserId", metro.findByProps("getStreamerActivityByUserId")],
-      ];
-
-      for (const [name, store] of stores) {
-        if (!store) {
-          logger.log(`[ACTIVITY STORE] ${name}: NOT FOUND`);
-          continue;
-        }
-
-        logger.log(`[ACTIVITY STORE] ${name}: FOUND`);
-        logger.log(
-          `[ACTIVITY STORE] ${name} keys: ${JSON.stringify(
-            Object.keys(store),
-          )}`,
-        );
-
-        const proto = Object.getPrototypeOf(store);
-
-        if (proto) {
-          logger.log(
-            `[ACTIVITY STORE] ${name} prototype: ${JSON.stringify(
-              Object.getOwnPropertyNames(proto),
-            )}`,
-          );
-        }
+class DiscordBetterRichPresenceBar {
+    static start() {
+        logger.log("[DBRP] start()");
 
         try {
-          const fn = store[name];
-
-          logger.log(
-            `[ACTIVITY STORE] ${name} typeof: ${typeof fn}`,
-          );
-
-          if (typeof fn === "function") {
-            const result = fn.call(store, userId);
-
+            logger.log(`[DBRP] metro = ${typeof metro}`);
             logger.log(
-              `[ACTIVITY STORE] ${name} result: ${JSON.stringify(
-                result,
-                (_, value) => {
-                  if (typeof value === "bigint") return value.toString();
-                  if (typeof value === "function") return "[Function]";
-                  return value;
-                },
-              )}`,
+                `[DBRP] findByProps = ${typeof metro?.findByProps}`,
             );
-          }
+
+            if (typeof metro?.findByProps !== "function") {
+                logger.error("[DBRP] metro.findByProps is unavailable");
+                return;
+            }
+
+            const userId = "1459041073136402453";
+
+            const names = [
+                "getActivities",
+                "getActivity",
+                "getStatus",
+                "getStreamerActivityByUserId",
+            ];
+
+            for (const name of names) {
+                try {
+                    const store = metro.findByProps(name);
+
+                    logger.log(
+                        `[DBRP] ${name}: ${
+                            store ? "FOUND" : "NOT FOUND"
+                        }`,
+                    );
+
+                    if (!store) continue;
+
+                    logger.log(
+                        `[DBRP] ${name} keys: ${JSON.stringify(
+                            Object.keys(store),
+                        )}`,
+                    );
+
+                    const proto = Object.getPrototypeOf(store);
+
+                    logger.log(
+                        `[DBRP] ${name} prototype: ${
+                            proto
+                                ? JSON.stringify(
+                                      Object.getOwnPropertyNames(proto),
+                                  )
+                                : "null"
+                        }`,
+                    );
+
+                    const fn = store[name];
+
+                    logger.log(
+                        `[DBRP] ${name} typeof: ${typeof fn}`,
+                    );
+
+                    if (typeof fn !== "function") {
+                        continue;
+                    }
+
+                    const result = fn.call(store, userId);
+
+                    logger.log(
+                        `[DBRP] ${name} result: ${JSON.stringify(
+                            result,
+                            (_, value) => {
+                                if (typeof value === "bigint") {
+                                    return value.toString();
+                                }
+
+                                if (typeof value === "function") {
+                                    return "[Function]";
+                                }
+
+                                return value;
+                            },
+                        )}`,
+                    );
+                } catch (error) {
+                    logger.error(
+                        `[DBRP] ${name} ERROR: ${String(error)}`,
+                    );
+                }
+            }
         } catch (error) {
-          logger.error(
-            `[ACTIVITY STORE] ${name} invocation failed: ${String(error)}`,
-          );
+            logger.error(
+                `[DBRP] start() FATAL: ${String(error)}`,
+            );
         }
-      }
-    } catch (error) {
-      logger.error(`[ACTIVITY STORE] FATAL: ${String(error)}`);
     }
-  },
-};
+
+    static stop() {
+        logger.log("[DBRP] stop()");
+    }
+}
+
+export default DiscordBetterRichPresenceBar;

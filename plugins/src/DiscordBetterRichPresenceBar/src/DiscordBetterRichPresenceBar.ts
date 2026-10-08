@@ -1,159 +1,190 @@
 import { logger } from "@vendetta";
 import { after } from "@vendetta/patcher";
 import { findByTypeName } from "@vendetta/metro";
+import { afterJSX } from "@revenge-mod/react/jsx-runtime";
 
 type Unpatch = () => unknown;
 
-function getTypeName(node: any): string {
-    if (!node) {
-        return "Unknown";
-    }
-
-    const type = node.type;
-
+function getTypeName(type: any): string {
     if (typeof type === "string") {
         return type;
     }
 
     if (typeof type === "function") {
-        return (
-            type.displayName ||
-            type.name ||
-            "Anonymous"
-        );
+        return type.displayName || type.name || "Anonymous";
     }
 
     if (type && typeof type === "object") {
-        return (
-            type.displayName ||
-            type.name ||
-            "Object"
-        );
+        return type.displayName || type.name || "Object";
     }
 
     return "Unknown";
 }
 
-function findUserProfileActivity(
-    node: any,
+function safeValue(
+    value: any,
+    depth = 0,
     seen = new WeakSet<object>(),
-): any | null {
+): string {
+    if (value === null) {
+        return "null";
+    }
+
+    if (value === undefined) {
+        return "undefined";
+    }
+
+    if (typeof value === "string") {
+        return JSON.stringify(value);
+    }
+
     if (
-        !node ||
-        typeof node !== "object"
+        typeof value === "number" ||
+        typeof value === "boolean" ||
+        typeof value === "bigint"
     ) {
-        return null;
+        return String(value);
     }
 
-    if (seen.has(node)) {
-        return null;
+    if (typeof value === "function") {
+        return `[Function ${value.name || "anonymous"}]`;
     }
 
-    seen.add(node);
+    if (typeof value !== "object") {
+        return String(value);
+    }
 
+    if (seen.has(value)) {
+        return "[Circular]";
+    }
+
+    if (depth >= 3) {
+        return `[${value.constructor?.name || "Object"}]`;
+    }
+
+    seen.add(value);
+
+    if (Array.isArray(value)) {
+        return `[${value
+            .slice(0, 20)
+            .map((item) =>
+                safeValue(
+                    item,
+                    depth + 1,
+                    seen,
+                ),
+            )
+            .join(", ")}]`;
+    }
+
+    const output: string[] = [];
+
+    for (const key of Object.keys(value).slice(0, 50)) {
+        try {
+            output.push(
+                `${key}: ${safeValue(
+                    value[key],
+                    depth + 1,
+                    seen,
+                )}`,
+            );
+        } catch {
+            output.push(
+                `${key}: [Unreadable]`,
+            );
+        }
+    }
+
+    return `{ ${output.join(", ")} }`;
+}
+
+function dumpElement(
+    element: any,
+): void {
     if (
-        getTypeName(node) ===
-        "UserProfileActivity"
+        !element ||
+        typeof element !== "object"
     ) {
-        return node;
+        return;
     }
 
-    const props = node.props;
+    const type = getTypeName(element.type);
+    const props = element.props;
+
+    logger.log(
+        `[DiscordBetterRichPresenceBar] JSX element <${type}>`,
+    );
 
     if (
         !props ||
         typeof props !== "object"
     ) {
-        return null;
-    }
-
-    const children = props.children;
-
-    if (Array.isArray(children)) {
-        for (const child of children) {
-            const found =
-                findUserProfileActivity(
-                    child,
-                    seen,
-                );
-
-            if (found) {
-                return found;
-            }
-        }
-
-        return null;
-    }
-
-    return findUserProfileActivity(
-        children,
-        seen,
-    );
-}
-
-function dumpActivityType(
-    activity: any,
-): void {
-    const type = activity?.type;
-
-    logger.log(
-        "[DiscordBetterRichPresenceBar] UserProfileActivity type:",
-    );
-
-    if (typeof type === "function") {
         logger.log(
-            `[DiscordBetterRichPresenceBar] type.name: ${type.name || "Anonymous"}`,
+            "[DiscordBetterRichPresenceBar] props: null",
         );
-
-        logger.log(
-            `[DiscordBetterRichPresenceBar] type.displayName: ${type.displayName || "undefined"}`,
-        );
-
-        try {
-            const source =
-                Function.prototype.toString.call(
-                    type,
-                );
-
-            logger.log(
-                `[DiscordBetterRichPresenceBar] type source length: ${source.length}`,
-            );
-
-            logger.log(
-                `[DiscordBetterRichPresenceBar] type source:\n${source}`,
-            );
-        } catch (error) {
-            logger.error(
-                `[DiscordBetterRichPresenceBar] Failed to inspect type: ${String(error)}`,
-            );
-        }
 
         return;
     }
 
     logger.log(
-        `[DiscordBetterRichPresenceBar] type is ${typeof type}: ${String(type)}`,
+        `[DiscordBetterRichPresenceBar] props:\n${safeValue(props)}`,
     );
 
-    if (
-        type &&
-        typeof type === "object"
-    ) {
-        try {
-            logger.log(
-                `[DiscordBetterRichPresenceBar] type object keys: ${Object.keys(type).join(", ")}`,
-            );
-        } catch (error) {
-            logger.error(
-                `[DiscordBetterRichPresenceBar] Failed to inspect type object: ${String(error)}`,
-            );
-        }
+    const children = props.children;
+
+    if (children === undefined) {
+        logger.log(
+            "[DiscordBetterRichPresenceBar] children: undefined",
+        );
+
+        return;
     }
+
+    if (Array.isArray(children)) {
+        logger.log(
+            `[DiscordBetterRichPresenceBar] children: array(${children.length})`,
+        );
+
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+
+            if (
+                child &&
+                typeof child === "object"
+            ) {
+                logger.log(
+                    `[DiscordBetterRichPresenceBar] child[${i}] <${getTypeName(child.type)}> props=${safeValue(child.props)}`,
+                );
+            } else {
+                logger.log(
+                    `[DiscordBetterRichPresenceBar] child[${i}]=${safeValue(child)}`,
+                );
+            }
+        }
+
+        return;
+    }
+
+    if (
+        children &&
+        typeof children === "object"
+    ) {
+        logger.log(
+            `[DiscordBetterRichPresenceBar] child <${getTypeName(children.type)}> props=${safeValue(children.props)}`,
+        );
+
+        return;
+    }
+
+    logger.log(
+        `[DiscordBetterRichPresenceBar] children=${safeValue(children)}`,
+    );
 }
 
 export class DiscordBetterRichPresenceBar {
-    private unpatch: Unpatch | null = null;
+    private unpatches: Unpatch[] = [];
     private started = false;
+    private activityType: any = null;
 
     public start(): void {
         if (this.started) {
@@ -184,22 +215,13 @@ export class DiscordBetterRichPresenceBar {
 
         this.started = false;
 
-        logger.log(
-            "[DiscordBetterRichPresenceBar] Plugin unloading",
-        );
-
-        const unpatch = this.unpatch;
-        this.unpatch = null;
-
-        if (typeof unpatch === "function") {
+        for (const unpatch of this.unpatches.splice(0)) {
             try {
                 unpatch();
-            } catch (error) {
-                logger.error(
-                    `[DiscordBetterRichPresenceBar] Failed to unpatch: ${String(error)}`,
-                );
-            }
+            } catch {}
         }
+
+        this.activityType = null;
 
         logger.log(
             "[DiscordBetterRichPresenceBar] Plugin unloaded",
@@ -218,35 +240,89 @@ export class DiscordBetterRichPresenceBar {
             return;
         }
 
-        logger.log(
-            "[DiscordBetterRichPresenceBar] UserProfileContent found",
-        );
-
-        this.unpatch = after(
-            "type",
-            UserProfileContent,
-            (_args, result) => {
-                if (
-                    !result ||
-                    typeof result !== "object"
-                ) {
-                    return;
-                }
-
-                const activity =
-                    findUserProfileActivity(result);
-
-                if (!activity) {
-                    return;
-                }
-
-                dumpActivityType(activity);
-            },
+        this.unpatches.push(
+            after(
+                "type",
+                UserProfileContent,
+                (_args, result) => {
+                    this.findActivityType(result);
+                },
+            ),
         );
 
         logger.log(
             "[DiscordBetterRichPresenceBar] UserProfileContent patched",
         );
+    }
+
+    private findActivityType(
+        node: any,
+    ): void {
+        if (
+            !node ||
+            typeof node !== "object"
+        ) {
+            return;
+        }
+
+        if (
+            getTypeName(node.type) ===
+            "UserProfileActivity"
+        ) {
+            if (this.activityType === node.type) {
+                return;
+            }
+
+            this.activityType = node.type;
+
+            logger.log(
+                "[DiscordBetterRichPresenceBar] Found UserProfileActivity JSX type",
+            );
+
+            this.patchActivityJSX(node.type);
+
+            return;
+        }
+
+        const props = node.props;
+
+        if (
+            !props ||
+            typeof props !== "object"
+        ) {
+            return;
+        }
+
+        const children = props.children;
+
+        if (Array.isArray(children)) {
+            for (const child of children) {
+                this.findActivityType(child);
+            }
+
+            return;
+        }
+
+        this.findActivityType(children);
+    }
+
+    private patchActivityJSX(
+        activityType: any,
+    ): void {
+        const unpatch = afterJSX(
+            activityType,
+            (element: any) => {
+                logger.log(
+                    "[DiscordBetterRichPresenceBar] UserProfileActivity JSX intercepted",
+                );
+
+                dumpElement(element);
+
+                return element;
+            },
+        );
+
+        this.unpatches.push(unpatch);
     }
 }
 

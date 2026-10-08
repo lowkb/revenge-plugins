@@ -8,6 +8,79 @@ interface InspectState {
     count: number;
 }
 
+function inspectTree(
+    node: any,
+    lines: string[],
+    state: InspectState,
+    depth = 0,
+    maxDepth = 12,
+): void {
+    if (
+        !node ||
+        typeof node !== "object" ||
+        depth > maxDepth ||
+        state.count >= 500
+    ) {
+        return;
+    }
+
+    state.count++;
+
+    const type = node.type;
+
+    const typeName =
+        typeof type === "string"
+            ? type
+            : typeof type === "function"
+                ? type.displayName ||
+                  type.name ||
+                  "Anonymous"
+                : type &&
+                    typeof type === "object"
+                    ? type.displayName ||
+                      type.name ||
+                      "Object"
+                    : "Unknown";
+
+    const props =
+        node.props &&
+        typeof node.props === "object"
+            ? node.props
+            : null;
+
+    const propKeys = props
+        ? Object.keys(props)
+        : [];
+
+    lines.push(
+        `${"  ".repeat(depth)}${typeName} props=[${propKeys.join(", ")}]`,
+    );
+
+    const children = props?.children;
+
+    if (Array.isArray(children)) {
+        for (const child of children) {
+            inspectTree(
+                child,
+                lines,
+                state,
+                depth + 1,
+                maxDepth,
+            );
+        }
+
+        return;
+    }
+
+    inspectTree(
+        children,
+        lines,
+        state,
+        depth + 1,
+        maxDepth,
+    );
+}
+
 export class DiscordBetterRichPresenceBar {
     private unpatch: Unpatch | null = null;
     private started = false;
@@ -57,6 +130,10 @@ export class DiscordBetterRichPresenceBar {
                 );
             }
         }
+
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Plugin unloaded",
+        );
     }
 
     private patchUserProfileContent(): void {
@@ -74,8 +151,6 @@ export class DiscordBetterRichPresenceBar {
         logger.log(
             "[DiscordBetterRichPresenceBar] UserProfileContent found",
         );
-
-        const inspectTree = this.inspectTree.bind(this);
 
         this.unpatch = after(
             "type",
@@ -107,79 +182,6 @@ export class DiscordBetterRichPresenceBar {
 
         logger.log(
             "[DiscordBetterRichPresenceBar] UserProfileContent patched",
-        );
-    }
-
-    private inspectTree(
-        node: any,
-        lines: string[],
-        state: InspectState,
-        depth = 0,
-        maxDepth = 12,
-    ): void {
-        if (
-            !node ||
-            typeof node !== "object" ||
-            depth > maxDepth ||
-            state.count >= 500
-        ) {
-            return;
-        }
-
-        state.count++;
-
-        const type = node.type;
-
-        const typeName =
-            typeof type === "string"
-                ? type
-                : typeof type === "function"
-                    ? type.displayName ||
-                      type.name ||
-                      "Anonymous"
-                    : type &&
-                        typeof type === "object"
-                        ? type.displayName ||
-                          type.name ||
-                          "Object"
-                        : "Unknown";
-
-        const props =
-            node.props &&
-            typeof node.props === "object"
-                ? node.props
-                : null;
-
-        const propKeys = props
-            ? Object.keys(props)
-            : [];
-
-        lines.push(
-            `${"  ".repeat(depth)}${typeName} props=[${propKeys.join(", ")}]`,
-        );
-
-        const children = props?.children;
-
-        if (Array.isArray(children)) {
-            for (const child of children) {
-                inspectTree(
-                    child,
-                    lines,
-                    state,
-                    depth + 1,
-                    maxDepth,
-                );
-            }
-
-            return;
-        }
-
-        inspectTree(
-            children,
-            lines,
-            state,
-            depth + 1,
-            maxDepth,
         );
     }
 }

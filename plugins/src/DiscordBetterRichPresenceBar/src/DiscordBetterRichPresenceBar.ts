@@ -1,116 +1,105 @@
-import { logger, metro, patcher } from "@vendetta";
+import { logger, metro } from "@vendetta";
 
-const targets = [
-    "PresenceActivityStatus",
-    "ActivityStatus",
-    "ApplicationStreamActivityStatus",
-    "ActivityStatusText",
-    "ActivityStatusIcon",
+const getterNames = [
+    "getActivities",
+    "getActivity",
+    "getActivitiesForUser",
+    "getUserActivities",
+    "getCurrentUserActivities",
+    "getPresence",
+    "getPresenceForUser",
+    "getPresenceStatus",
+    "getStatus",
 ];
 
-const patches: (() => void)[] = [];
-
-function simplify(value: any, depth = 0): any {
-    if (depth > 4) return "[MaxDepth]";
-
-    if (value === null || value === undefined) {
-        return value;
-    }
-
-    if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean"
-    ) {
-        return value;
-    }
-
-    if (typeof value === "function") {
-        return `[Function ${value.name || "anonymous"}]`;
-    }
-
-    if (Array.isArray(value)) {
-        return value.map((item) => simplify(item, depth + 1));
-    }
-
-    if (typeof value === "object") {
-        const result: Record<string, any> = {};
-
-        for (const key of Object.keys(value)) {
-            try {
-                result[key] = simplify(value[key], depth + 1);
-            } catch {
-                result[key] = "[Unreadable]";
-            }
-        }
-
-        return result;
-    }
-
-    return `[${typeof value}]`;
-}
-
-function patchFunction(name: string) {
+function inspectGetter(name: string) {
     try {
-        const module = metro.findByName(name, false);
+        const module = metro.findByProps(name);
 
-        if (!module || typeof module.default !== "function") {
-            logger.log(
-                `[DiscordBetterRichPresenceBar] ${name}: unavailable`,
-            );
+        if (!module) {
             return;
         }
 
-        const unpatch = patcher.before(
-            "default",
-            module,
-            (args: any[]) => {
-                try {
-                    logger.log(
-                        `[DiscordBetterRichPresenceBar] ${name} PROPS:`,
-                        simplify(args?.[0]),
-                    );
-                } catch (error) {
-                    logger.error(
-                        `[DiscordBetterRichPresenceBar] ${name} logger failed`,
-                        error,
-                    );
-                }
-            },
-        );
-
-        patches.push(unpatch);
-
         logger.log(
-            `[DiscordBetterRichPresenceBar] ${name}: patched`,
+            `[DiscordBetterRichPresenceBar] FOUND ${name}:`,
+            {
+                keys: Object.keys(module),
+                functions: Object.keys(module).filter(
+                    (key) => typeof module[key] === "function",
+                ),
+            },
         );
     } catch (error) {
         logger.error(
-            `[DiscordBetterRichPresenceBar] ${name}: patch failed`,
+            `[DiscordBetterRichPresenceBar] ${name} failed`,
+            error,
+        );
+    }
+}
+
+function scanActivityModules() {
+    try {
+        const modules = metro.findAll((module: any) => {
+            const keys = Object.keys(module);
+
+            return keys.some((key) =>
+                /activity|activities|presence/i.test(key),
+            );
+        });
+
+        logger.log(
+            `[DiscordBetterRichPresenceBar] Activity-related modules: ${modules.length}`,
+        );
+
+        for (const module of modules.slice(0, 100)) {
+            try {
+                const keys = Object.keys(module);
+
+                const interesting = keys.filter((key) =>
+                    /activity|activities|presence/i.test(key),
+                );
+
+                if (interesting.length === 0) {
+                    continue;
+                }
+
+                logger.log(
+                    `[DiscordBetterRichPresenceBar] MODULE:`,
+                    {
+                        name: module.name,
+                        displayName: module.displayName,
+                        interesting,
+                        functions: interesting.filter(
+                            (key) =>
+                                typeof module[key] === "function",
+                        ),
+                    },
+                );
+            } catch {}
+        }
+    } catch (error) {
+        logger.error(
+            "[DiscordBetterRichPresenceBar] module scan failed",
             error,
         );
     }
 }
 
 function start() {
-    for (const target of targets) {
-        patchFunction(target);
+    logger.log(
+        "[DiscordBetterRichPresenceBar] Store diagnostic started",
+    );
+
+    for (const name of getterNames) {
+        inspectGetter(name);
     }
 
-    logger.log(
-        "[DiscordBetterRichPresenceBar] Activity diagnostic loaded",
-    );
+    scanActivityModules();
 }
 
 function stop() {
-    for (const unpatch of patches.splice(0)) {
-        try {
-            unpatch();
-        } catch {}
-    }
-
     logger.log(
-        "[DiscordBetterRichPresenceBar] Activity diagnostic unloaded",
+        "[DiscordBetterRichPresenceBar] Store diagnostic stopped",
     );
 }
 

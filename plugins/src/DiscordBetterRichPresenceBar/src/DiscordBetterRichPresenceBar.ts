@@ -28,27 +28,25 @@ type ReactElement = {
 const patches: (() => unknown)[] = [];
 
 function getUserStore() {
-    return metro.findByName("UserStore");
+    return metro.findByProps("getCurrentUser");
 }
 
 function getCurrentUserId(): string | undefined {
-    const UserStore = getUserStore();
-
-    return UserStore?.getCurrentUser?.()?.id;
+    return getUserStore()?.getCurrentUser?.()?.id;
 }
 
-function normalizeUrl(url: unknown): string | null {
-    if (typeof url !== "string") return null;
+function normalizeUrl(value: unknown): string | null {
+    if (typeof value !== "string") return null;
 
-    const value = url.trim();
+    const url = value.trim();
 
-    return /^https?:\/\//i.test(value) ? value : null;
+    return /^https?:\/\//i.test(url) ? url : null;
 }
 
 function getActivityButtons(activity?: Activity): ActivityButton[] {
     if (!activity) return [];
 
-    const result: ActivityButton[] = [];
+    const buttons: ActivityButton[] = [];
 
     if (Array.isArray(activity.buttons)) {
         for (const button of activity.buttons) {
@@ -56,17 +54,22 @@ function getActivityButtons(activity?: Activity): ActivityButton[] {
                 const url = normalizeUrl(button);
 
                 if (url) {
-                    result.push({ label: "Open", url });
-                }
-            } else {
-                const url = normalizeUrl(button?.url);
-
-                if (url) {
-                    result.push({
-                        label: button.label?.trim() || "Open",
+                    buttons.push({
+                        label: "Open",
                         url,
                     });
                 }
+
+                continue;
+            }
+
+            const url = normalizeUrl(button?.url);
+
+            if (url) {
+                buttons.push({
+                    label: button.label?.trim() || "Open",
+                    url,
+                });
             }
         }
     }
@@ -76,7 +79,7 @@ function getActivityButtons(activity?: Activity): ActivityButton[] {
             const url = normalizeUrl(value);
 
             if (url) {
-                result.push({
+                buttons.push({
                     label: "Open",
                     url,
                 });
@@ -84,7 +87,7 @@ function getActivityButtons(activity?: Activity): ActivityButton[] {
         }
     }
 
-    return result.slice(0, 2);
+    return buttons.slice(0, 2);
 }
 
 async function openUrl(url: string) {
@@ -100,7 +103,10 @@ async function openUrl(url: string) {
     }
 }
 
-function createButton(button: ActivityButton, React: typeof import("react")) {
+function createButton(
+    button: ActivityButton,
+    React: typeof import("react"),
+) {
     const ReactNative = metro.common.ReactNative;
 
     if (!ReactNative?.Pressable || !ReactNative?.Text) {
@@ -128,7 +134,7 @@ function createButton(button: ActivityButton, React: typeof import("react")) {
     );
 }
 
-function createButtons(
+function createButtonBar(
     buttons: ActivityButton[],
     React: typeof import("react"),
 ) {
@@ -141,6 +147,7 @@ function createButtons(
     return React.createElement(
         ReactNative.View,
         {
+            key: "discord-better-rich-presence-buttons",
             style: {
                 flexDirection: "row",
                 flexWrap: "wrap",
@@ -152,35 +159,48 @@ function createButtons(
 }
 
 function patchActivityContainer() {
-    const ActivityContainer = metro.findByName("UserActivityContainer");
+    const ActivityModule = metro.findByDisplayName(
+        "UserActivityContainer",
+        false,
+    );
 
-    if (!ActivityContainer?.prototype?.render) {
-        throw new Error("UserActivityContainer.render not found");
+    if (!ActivityModule?.default) {
+        throw new Error("UserActivityContainer module not found");
     }
 
     const React = metro.common.React;
 
-    const unpatch = patcher.after(
-        "render",
-        ActivityContainer.prototype,
-        function (
-            this: { props?: ActivityProps },
-            result: ReactElement,
-        ) {
-            const currentUserId = getCurrentUserId();
-            const userId = this.props?.user?.id;
+    if (!React?.createElement) {
+        throw new Error("Discord React module not found");
+    }
 
-            if (!currentUserId || !userId || currentUserId !== userId) {
+    const unpatch = patcher.after(
+        "default",
+        ActivityModule,
+        function (
+            args: [ActivityProps],
+            result: ReactElement | null,
+        ) {
+            const props = args?.[0];
+
+            const currentUserId = getCurrentUserId();
+            const profileUserId = props?.user?.id;
+
+            if (!currentUserId || !profileUserId) {
                 return result;
             }
 
-            const buttons = getActivityButtons(this.props?.activity);
+            if (currentUserId !== profileUserId) {
+                return result;
+            }
+
+            const buttons = getActivityButtons(props.activity);
 
             if (buttons.length === 0 || !result?.props) {
                 return result;
             }
 
-            const buttonBar = createButtons(buttons, React);
+            const buttonBar = createButtonBar(buttons, React);
 
             if (!buttonBar) {
                 return result;
@@ -188,14 +208,12 @@ function patchActivityContainer() {
 
             const children = result.props.children;
 
-            if (Array.isArray(children)) {
-                result.props.children = [...children, buttonBar];
-            } else {
-                result.props.children = [
-                    children,
-                    buttonBar,
-                ];
-            }
+            result.props = {
+                ...result.props,
+                children: Array.isArray(children)
+                    ? [...children, buttonBar]
+                    : [children, buttonBar],
+            };
 
             return result;
         },
@@ -209,9 +227,15 @@ const start = () => {
 
     try {
         patchActivityContainer();
-        logger.log("[DiscordBetterRichPresenceBar] Loaded");
+
+        logger.log(
+            "[DiscordBetterRichPresenceBar] Loaded",
+        );
     } catch (error) {
-        logger.error("[DiscordBetterRichPresenceBar] Failed to load", error);
+        logger.error(
+            "[DiscordBetterRichPresenceBar] Failed to load",
+            error,
+        );
     }
 };
 
@@ -220,11 +244,16 @@ const stop = () => {
         try {
             unpatch();
         } catch (error) {
-            logger.error("[DiscordBetterRichPresenceBar] Failed to unpatch", error);
+            logger.error(
+                "[DiscordBetterRichPresenceBar] Failed to unpatch",
+                error,
+            );
         }
     }
 
-    logger.log("[DiscordBetterRichPresenceBar] Unloaded");
+    logger.log(
+        "[DiscordBetterRichPresenceBar] Unloaded",
+    );
 };
 
 export default {

@@ -5,69 +5,36 @@ class DiscordBetterRichPresenceBar {
         logger.log("[DBRP] start()");
 
         try {
-            logger.log(`[DBRP] metro = ${typeof metro}`);
-            logger.log(
-                `[DBRP] findByProps = ${typeof metro?.findByProps}`,
-            );
+            const userId = "1459041073136402453";
+            const store = metro.findByProps("getActivities");
 
-            if (typeof metro?.findByProps !== "function") {
-                logger.error("[DBRP] metro.findByProps is unavailable");
+            if (!store) {
+                logger.error("[DBRP] Activity store not found");
                 return;
             }
 
-            const userId = "1459041073136402453";
+            const activities = store.getActivities(userId);
 
-            const names = [
-                "getActivities",
-                "getActivity",
-                "getStatus",
-                "getStreamerActivityByUserId",
-            ];
+            logger.log(
+                `[DBRP] activities: ${JSON.stringify(activities)}`,
+            );
 
-            for (const name of names) {
+            const metadata = store.getActivityMetadata;
+
+            logger.log(
+                `[DBRP] getActivityMetadata typeof: ${typeof metadata}`,
+            );
+
+            if (typeof metadata !== "function") {
+                return;
+            }
+
+            for (const activity of activities ?? []) {
                 try {
-                    const store = metro.findByProps(name);
+                    const result = metadata.call(store, activity);
 
                     logger.log(
-                        `[DBRP] ${name}: ${
-                            store ? "FOUND" : "NOT FOUND"
-                        }`,
-                    );
-
-                    if (!store) continue;
-
-                    logger.log(
-                        `[DBRP] ${name} keys: ${JSON.stringify(
-                            Object.keys(store),
-                        )}`,
-                    );
-
-                    const proto = Object.getPrototypeOf(store);
-
-                    logger.log(
-                        `[DBRP] ${name} prototype: ${
-                            proto
-                                ? JSON.stringify(
-                                      Object.getOwnPropertyNames(proto),
-                                  )
-                                : "null"
-                        }`,
-                    );
-
-                    const fn = store[name];
-
-                    logger.log(
-                        `[DBRP] ${name} typeof: ${typeof fn}`,
-                    );
-
-                    if (typeof fn !== "function") {
-                        continue;
-                    }
-
-                    const result = fn.call(store, userId);
-
-                    logger.log(
-                        `[DBRP] ${name} result: ${JSON.stringify(
+                        `[DBRP] metadata(${activity.name}): ${JSON.stringify(
                             result,
                             (_, value) => {
                                 if (typeof value === "bigint") {
@@ -84,13 +51,13 @@ class DiscordBetterRichPresenceBar {
                     );
                 } catch (error) {
                     logger.error(
-                        `[DBRP] ${name} ERROR: ${String(error)}`,
+                        `[DBRP] metadata(${activity.name}) ERROR: ${String(error)}`,
                     );
                 }
             }
         } catch (error) {
             logger.error(
-                `[DBRP] start() FATAL: ${String(error)}`,
+                `[DBRP] FATAL: ${String(error)}`,
             );
         }
     }

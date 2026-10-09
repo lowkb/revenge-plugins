@@ -4,10 +4,7 @@ import {
     findByStoreName,
     findByTypeName,
 } from "@vendetta/metro";
-import {
-    React,
-    ReactNative,
-} from "@vendetta/metro/common";
+import { React, ReactNative } from "@vendetta/metro/common";
 import { showToast } from "@vendetta/ui/toasts";
 
 type Unpatch = () => unknown;
@@ -18,7 +15,6 @@ interface Activity {
     name?: string;
     details?: string;
     state?: string;
-    type?: number;
     buttons?: unknown[];
     metadata?: {
         button_urls?: string[];
@@ -30,37 +26,31 @@ interface ActivityButton {
     url?: string;
 }
 
+interface UserProfileActivityProps {
+    user?: {
+        id?: string;
+    };
+}
+
 const h = React.createElement;
 
-function getActivities(
-    userId: string,
-): Activity[] {
+function getActivities(userId: string): Activity[] {
     try {
-        const PresenceStore =
-            findByStoreName("PresenceStore");
+        const PresenceStore = findByStoreName("PresenceStore");
 
         if (
             !PresenceStore ||
-            typeof PresenceStore.getActivities !==
-                "function"
+            typeof PresenceStore.getActivities !== "function"
         ) {
-            logger.log(
-                "[DBRP] PresenceStore.getActivities not found",
-            );
-
             return [];
         }
 
-        const result =
-            PresenceStore.getActivities(
-                userId,
-            );
+        const result: unknown =
+            PresenceStore.getActivities(userId);
 
-        if (!Array.isArray(result)) {
-            return [];
-        }
-
-        return result;
+        return Array.isArray(result)
+            ? result as Activity[]
+            : [];
     } catch (error) {
         logger.error(
             `[DBRP] getActivities failed: ${String(error)}`,
@@ -70,27 +60,16 @@ function getActivities(
     }
 }
 
-function getButtons(
-    activity: Activity,
-): ActivityButton[] {
-    if (
-        !Array.isArray(
-            activity.buttons,
-        )
-    ) {
+function getButtons(activity: Activity): ActivityButton[] {
+    if (!Array.isArray(activity.buttons)) {
         return [];
     }
 
-    const urls =
-        activity.metadata?.button_urls ??
-        [];
+    const urls = activity.metadata?.button_urls ?? [];
 
     return activity.buttons
-        .map((button, index) => {
-            if (
-                typeof button ===
-                "string"
-            ) {
+        .map((button, index): ActivityButton | null => {
+            if (typeof button === "string") {
                 return {
                     label: button,
                     url: urls[index],
@@ -98,105 +77,91 @@ function getButtons(
             }
 
             if (
-                button &&
-                typeof button ===
-                    "object"
+                button !== null &&
+                typeof button === "object"
             ) {
-                const value =
-                    button as {
-                        label?: string;
-                        url?: string;
-                    };
+                const value = button as {
+                    label?: unknown;
+                    url?: unknown;
+                };
 
                 return {
                     label:
-                        value.label ??
-                        `Button ${index + 1}`,
+                        typeof value.label === "string" &&
+                        value.label.trim()
+                            ? value.label
+                            : `Button ${index + 1}`,
                     url:
-                        value.url ??
-                        urls[index],
+                        typeof value.url === "string"
+                            ? value.url
+                            : urls[index],
                 };
             }
 
             return null;
         })
         .filter(
-            (
-                button,
-            ): button is ActivityButton =>
-                Boolean(
-                    button?.label,
-                ),
+            (button): button is ActivityButton =>
+                button !== null &&
+                button.label.trim().length > 0,
         )
         .slice(0, 2);
 }
 
-async function openButton(
-    url?: string,
-): Promise<void> {
-    if (
-        !url ||
-        !/^https?:\/\//i.test(url)
-    ) {
-        showToast(
-            "This Rich Presence button has no URL",
-        );
+function isValidUrl(url?: string): url is string {
+    return (
+        typeof url === "string" &&
+        /^https?:\/\/\S+$/i.test(url)
+    );
+}
 
+async function openButton(url?: string): Promise<void> {
+    if (!isValidUrl(url)) {
+        showToast("Rich Presence button has no valid URL");
         return;
     }
 
     try {
-        await ReactNative.Linking.openURL(
-            url,
-        );
+        await ReactNative.Linking.openURL(url);
     } catch (error) {
         logger.error(
             `[DBRP] Failed to open URL: ${String(error)}`,
         );
 
-        showToast(
-            "Failed to open Rich Presence URL",
-        );
+        showToast("Failed to open Rich Presence URL");
     }
 }
 
 function createButton(
     button: ActivityButton,
-    index: number,
+    key: string,
 ) {
     const {
         TouchableOpacity,
         Text,
     } = ReactNative;
 
-    const validUrl =
-        typeof button.url ===
-            "string" &&
-        /^https?:\/\//i.test(
-            button.url,
-        );
+    const validUrl = isValidUrl(button.url);
 
     return h(
         TouchableOpacity,
         {
-            key: `${button.label}-${index}`,
+            key,
             activeOpacity: 0.7,
-            onPress: () =>
-                void openButton(
-                    button.url,
-                ),
+            onPress: () => {
+                void openButton(button.url);
+            },
             style: {
                 flex: 1,
+                minWidth: 0,
                 minHeight: 40,
                 borderRadius: 8,
                 paddingHorizontal: 12,
                 alignItems: "center",
-                justifyContent:
-                    "center",
-                backgroundColor:
-                    validUrl
-                        ? "#5865F2"
-                        : "#4E5058",
+                justifyContent: "center",
+                backgroundColor: validUrl
+                    ? "#5865F2"
+                    : "#4E5058",
             },
         },
         h(
@@ -205,8 +170,7 @@ function createButton(
                 style: {
                     color: "#FFFFFF",
                     fontSize: 13,
-                    fontWeight:
-                        "600",
+                    fontWeight: "600",
                 },
                 numberOfLines: 1,
             },
@@ -215,33 +179,21 @@ function createButton(
     );
 }
 
-function createPresenceView(
-    activities: Activity[],
-) {
-    const {
-        View,
-        Text,
-    } = ReactNative;
+function createPresenceView(activities: Activity[]) {
+    const { View, Text } = ReactNative;
 
-    const validActivities =
-        activities
-            .map((activity) => ({
-                activity,
-                buttons:
-                    getButtons(
-                        activity,
-                    ),
-            }))
-            .filter(
-                (entry) =>
-                    entry.buttons.length >
-                    0,
-            );
+    const entries = activities
+        .map((activity, index) => ({
+            activity,
+            buttons: getButtons(activity),
+            key:
+                activity.id ??
+                activity.application_id ??
+                `activity-${index}`,
+        }))
+        .filter((entry) => entry.buttons.length > 0);
 
-    if (
-        validActivities.length ===
-        0
-    ) {
+    if (entries.length === 0) {
         return null;
     }
 
@@ -249,322 +201,78 @@ function createPresenceView(
         View,
         {
             style: {
+                width: "100%",
                 marginTop: 8,
                 padding: 12,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor:
-                    "#97979f0a",
-                backgroundColor:
-                    "#97979f14",
+                borderColor: "rgba(151,151,159,0.12)",
+                backgroundColor: "rgba(151,151,159,0.08)",
             },
         },
-
-        ...validActivities.map(
-            ({
-                activity,
-                buttons,
-            }, activityIndex) =>
+        ...entries.map(({ activity, buttons, key }) =>
+            h(
+                View,
+                {
+                    key,
+                    style: {
+                        marginBottom: 10,
+                    },
+                },
+                h(
+                    Text,
+                    {
+                        style: {
+                            color: "#FFFFFF",
+                            fontSize: 15,
+                            fontWeight: "600",
+                            marginBottom: 3,
+                        },
+                        numberOfLines: 1,
+                    },
+                    activity.name ?? "Rich Presence",
+                ),
+                activity.details || activity.state
+                    ? h(
+                          Text,
+                          {
+                              style: {
+                                  color: "#B5BAC1",
+                                  fontSize: 12,
+                                  marginBottom: 8,
+                              },
+                              numberOfLines: 2,
+                          },
+                          [
+                              activity.details,
+                              activity.state,
+                          ]
+                              .filter(Boolean)
+                              .join(" • "),
+                      )
+                    : null,
                 h(
                     View,
                     {
-                        key:
-                            activity.id ??
-                            activity.application_id ??
-                            activityIndex,
                         style: {
-                            marginBottom:
-                                activityIndex ===
-                                validActivities.length -
-                                    1
-                                    ? 0
-                                    : 10,
+                            flexDirection: "row",
+                            gap: 8,
                         },
                     },
-
-                    h(
-                        Text,
-                        {
-                            style: {
-                                color:
-                                    "#FFFFFF",
-                                fontSize: 15,
-                                fontWeight:
-                                    "600",
-                                marginBottom:
-                                    3,
-                            },
-                            numberOfLines: 1,
-                        },
-                        activity.name ??
-                            "Rich Presence",
-                    ),
-
-                    activity.details ||
-                    activity.state
-                        ? h(
-                              Text,
-                              {
-                                  style: {
-                                      color:
-                                          "#B5BAC1",
-                                      fontSize: 12,
-                                      marginBottom:
-                                          8,
-                                  },
-                                  numberOfLines: 2,
-                              },
-                              [
-                                  activity.details,
-                                  activity.state,
-                              ]
-                                  .filter(
-                                      Boolean,
-                                  )
-                                  .join(
-                                      " • ",
-                                  ),
-                          )
-                        : null,
-
-                    h(
-                        View,
-                        {
-                            style: {
-                                flexDirection:
-                                    "row",
-                                gap: 8,
-                            },
-                        },
-                        ...buttons.map(
-                            (
-                                button,
-                                index,
-                            ) =>
-                                createButton(
-                                    button,
-                                    index,
-                                ),
+                    ...buttons.map((button, index) =>
+                        createButton(
+                            button,
+                            `${key}-button-${index}`,
                         ),
                     ),
                 ),
+            ),
         ),
     );
 }
 
-function getTypeName(
-    type: any,
-): string {
-    if (
-        typeof type === "string"
-    ) {
-        return type;
-    }
-
-    if (
-        typeof type === "function"
-    ) {
-        return (
-            type.displayName ||
-            type.name ||
-            "Anonymous"
-        );
-    }
-
-    if (
-        type &&
-        typeof type === "object"
-    ) {
-        return (
-            type.displayName ||
-            type.name ||
-            "Object"
-        );
-    }
-
-    return "Unknown";
-}
-
-function inject(
-    node: any,
-): {
-    node: any;
-    changed: boolean;
-} {
-    if (
-        !node ||
-        typeof node !== "object"
-    ) {
-        return {
-            node,
-            changed: false,
-        };
-    }
-
-    const typeName =
-        getTypeName(node.type);
-
-    if (
-        typeName ===
-        "UserProfileActivity"
-    ) {
-        const userId =
-            node.props?.user?.id;
-
-        logger.log(
-            `[DBRP] Found UserProfileActivity user=${userId}`,
-        );
-
-        if (!userId) {
-            return {
-                node,
-                changed: false,
-            };
-        }
-
-        const activities =
-            getActivities(
-                String(userId),
-            );
-
-        logger.log(
-            `[DBRP] Activities: ${JSON.stringify(
-                activities,
-            )}`,
-        );
-
-        const presenceView =
-            createPresenceView(
-                activities,
-            );
-
-        if (!presenceView) {
-            logger.log(
-                "[DBRP] No activity buttons",
-            );
-
-            return {
-                node,
-                changed: false,
-            };
-        }
-
-        logger.log(
-            "[DBRP] Creating native Rich Presence button view",
-        );
-
-        return {
-            node: h(
-                ReactNative.View,
-                {
-                    style: {
-                        width: "100%",
-                    },
-                },
-                node,
-                presenceView,
-            ),
-            changed: true,
-        };
-    }
-
-    const props =
-        node.props;
-
-    if (
-        !props ||
-        typeof props !== "object"
-    ) {
-        return {
-            node,
-            changed: false,
-        };
-    }
-
-    const children =
-        props.children;
-
-    if (
-        Array.isArray(children)
-    ) {
-        let changed = false;
-
-        const nextChildren =
-            children.map(
-                (child: any) => {
-                    const result =
-                        inject(
-                            child,
-                        );
-
-                    if (
-                        result.changed
-                    ) {
-                        changed = true;
-                    }
-
-                    return result.node;
-                },
-            );
-
-        if (!changed) {
-            return {
-                node,
-                changed: false,
-            };
-        }
-
-        return {
-            node:
-                React.cloneElement(
-                    node,
-                    {
-                        children:
-                            nextChildren,
-                    },
-                ),
-            changed: true,
-        };
-    }
-
-    if (
-        children &&
-        typeof children ===
-            "object"
-    ) {
-        const result =
-            inject(children);
-
-        if (!result.changed) {
-            return {
-                node,
-                changed: false,
-            };
-        }
-
-        return {
-            node:
-                React.cloneElement(
-                    node,
-                    {
-                        children:
-                            result.node,
-                    },
-                ),
-            changed: true,
-        };
-    }
-
-    return {
-        node,
-        changed: false,
-    };
-}
-
 class DiscordBetterRichPresenceBar {
-    private unpatch:
-        Unpatch | null = null;
-
+    private unpatch: Unpatch | null = null;
     private started = false;
 
     start(): void {
@@ -572,91 +280,96 @@ class DiscordBetterRichPresenceBar {
             return;
         }
 
-        this.started = true;
+        logger.log("[DBRP] Plugin loading");
 
-        logger.log(
-            "[DBRP] Plugin loaded",
-        );
+        const UserProfileActivity =
+            findByTypeName("UserProfileActivity");
 
-        const UserProfileContent =
-            findByTypeName(
-                "UserProfileContent",
-            );
-
-        if (
-            !UserProfileContent
-        ) {
+        if (!UserProfileActivity) {
             logger.error(
-                "[DBRP] UserProfileContent not found",
+                "[DBRP] UserProfileActivity not found",
             );
-
             return;
         }
 
-        logger.log(
-            "[DBRP] UserProfileContent found",
-        );
+        try {
+            this.unpatch = after(
+                "type",
+                UserProfileActivity,
+                (args, result) => {
+                    try {
+                        const props =
+                            args?.[0] as
+                                | UserProfileActivityProps
+                                | undefined;
 
-        this.unpatch = after(
-            "type",
-            UserProfileContent,
-            (_args, result) => {
-                try {
-                    const injected =
-                        inject(
-                            result,
+                        const userId = props?.user?.id;
+
+                        if (!userId) {
+                            return result;
+                        }
+
+                        const activities =
+                            getActivities(String(userId));
+
+                        const presenceView =
+                            createPresenceView(activities);
+
+                        if (!presenceView) {
+                            return result;
+                        }
+
+                        logger.log(
+                            `[DBRP] Injecting buttons for user ${userId}`,
                         );
 
-                    if (
-                        !injected.changed
-                    ) {
+                        return h(
+                            ReactNative.View,
+                            {
+                                style: {
+                                    width: "100%",
+                                },
+                            },
+                            result,
+                            presenceView,
+                        );
+                    } catch (error) {
+                        logger.error(
+                            `[DBRP] Render injection failed: ${String(error)}`,
+                        );
+
                         return result;
                     }
+                },
+            );
 
-                    logger.log(
-                        "[DBRP] Rich Presence buttons injected",
-                    );
+            this.started = true;
 
-                    return injected.node;
-                } catch (error) {
-                    logger.error(
-                        `[DBRP] Injection failed: ${String(
-                            error,
-                        )}`,
-                    );
+            logger.log(
+                "[DBRP] UserProfileActivity patched",
+            );
+        } catch (error) {
+            this.unpatch = null;
 
-                    return result;
-                }
-            },
-        );
-
-        logger.log(
-            "[DBRP] UserProfileContent patched",
-        );
+            logger.error(
+                `[DBRP] Failed to patch component: ${String(error)}`,
+            );
+        }
     }
 
     stop(): void {
-        if (!this.started) {
-            return;
-        }
-
-        this.started = false;
-
         try {
             this.unpatch?.();
         } catch (error) {
             logger.error(
-                `[DBRP] Unpatch failed: ${String(
-                    error,
-                )}`,
+                `[DBRP] Unpatch failed: ${String(error)}`,
             );
         }
 
         this.unpatch = null;
+        this.started = false;
 
-        logger.log(
-            "[DBRP] Plugin unloaded",
-        );
+        logger.log("[DBRP] Plugin unloaded");
     }
 }
 

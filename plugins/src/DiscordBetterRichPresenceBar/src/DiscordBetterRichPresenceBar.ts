@@ -2,7 +2,7 @@ import { logger } from "@vendetta";
 import { after } from "@vendetta/patcher";
 import {
     findByStoreName,
-    findByTypeName,
+    findByTypeNameAll,
 } from "@vendetta/metro";
 import { React, ReactNative } from "@vendetta/metro/common";
 import { showToast } from "@vendetta/ui/toasts";
@@ -26,7 +26,7 @@ interface ActivityButton {
     url?: string;
 }
 
-interface UserProfileActivityProps {
+interface ProfileProps {
     user?: {
         id?: string;
     };
@@ -36,26 +36,20 @@ const h = React.createElement;
 
 function getActivities(userId: string): Activity[] {
     try {
-        const PresenceStore = findByStoreName("PresenceStore");
+        const store = findByStoreName("PresenceStore");
 
-        if (
-            !PresenceStore ||
-            typeof PresenceStore.getActivities !== "function"
-        ) {
+        if (!store || typeof store.getActivities !== "function") {
+            logger.error("[DBRP] PresenceStore.getActivities not found");
             return [];
         }
 
-        const result: unknown =
-            PresenceStore.getActivities(userId);
+        const result: unknown = store.getActivities(userId);
 
         return Array.isArray(result)
             ? result as Activity[]
             : [];
     } catch (error) {
-        logger.error(
-            `[DBRP] getActivities failed: ${String(error)}`,
-        );
-
+        logger.error(`[DBRP] getActivities failed: ${String(error)}`);
         return [];
     }
 }
@@ -76,10 +70,7 @@ function getButtons(activity: Activity): ActivityButton[] {
                 };
             }
 
-            if (
-                button !== null &&
-                typeof button === "object"
-            ) {
+            if (button && typeof button === "object") {
                 const value = button as {
                     label?: unknown;
                     url?: unknown;
@@ -102,17 +93,13 @@ function getButtons(activity: Activity): ActivityButton[] {
         })
         .filter(
             (button): button is ActivityButton =>
-                button !== null &&
-                button.label.trim().length > 0,
+                button !== null && button.label.trim().length > 0,
         )
         .slice(0, 2);
 }
 
 function isValidUrl(url?: string): url is string {
-    return (
-        typeof url === "string" &&
-        /^https?:\/\/\S+$/i.test(url)
-    );
+    return typeof url === "string" && /^https?:\/\/\S+$/i.test(url);
 }
 
 async function openButton(url?: string): Promise<void> {
@@ -124,23 +111,13 @@ async function openButton(url?: string): Promise<void> {
     try {
         await ReactNative.Linking.openURL(url);
     } catch (error) {
-        logger.error(
-            `[DBRP] Failed to open URL: ${String(error)}`,
-        );
-
+        logger.error(`[DBRP] Failed to open URL: ${String(error)}`);
         showToast("Failed to open Rich Presence URL");
     }
 }
 
-function createButton(
-    button: ActivityButton,
-    key: string,
-) {
-    const {
-        TouchableOpacity,
-        Text,
-    } = ReactNative;
-
+function createButton(button: ActivityButton, key: string) {
+    const { TouchableOpacity, Text } = ReactNative;
     const validUrl = isValidUrl(button.url);
 
     return h(
@@ -159,9 +136,7 @@ function createButton(
                 paddingHorizontal: 12,
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: validUrl
-                    ? "#5865F2"
-                    : "#4E5058",
+                backgroundColor: validUrl ? "#5865F2" : "#4E5058",
             },
         },
         h(
@@ -243,10 +218,7 @@ function createPresenceView(activities: Activity[]) {
                               },
                               numberOfLines: 2,
                           },
-                          [
-                              activity.details,
-                              activity.state,
-                          ]
+                          [activity.details, activity.state]
                               .filter(Boolean)
                               .join(" • "),
                       )
@@ -260,10 +232,7 @@ function createPresenceView(activities: Activity[]) {
                         },
                     },
                     ...buttons.map((button, index) =>
-                        createButton(
-                            button,
-                            `${key}-button-${index}`,
-                        ),
+                        createButton(button, `${key}-button-${index}`),
                     ),
                 ),
             ),
@@ -271,8 +240,18 @@ function createPresenceView(activities: Activity[]) {
     );
 }
 
+function findTargets(name: string): any[] {
+    try {
+        const result = findByTypeNameAll(name);
+        return Array.isArray(result) ? result : result ? [result] : [];
+    } catch (error) {
+        logger.error(`[DBRP] Search for ${name} failed: ${String(error)}`);
+        return [];
+    }
+}
+
 class DiscordBetterRichPresenceBar {
-    private unpatch: Unpatch | null = null;
+    private unpatches: Unpatch[] = [];
     private started = false;
 
     start(): void {
@@ -282,93 +261,98 @@ class DiscordBetterRichPresenceBar {
 
         logger.log("[DBRP] Plugin loading");
 
-        const UserProfileActivity =
-            findByTypeName("UserProfileActivity");
+        const activityTargets = findTargets("UserProfileActivity");
+        const contentTargets = activityTargets.length
+            ? []
+            : findTargets("UserProfileContent");
 
-        if (!UserProfileActivity) {
-            logger.error(
-                "[DBRP] UserProfileActivity not found",
-            );
+        const targets = [
+            ...new Set(
+                activityTargets.length ? activityTargets : contentTargets,
+            ),
+        ];
+
+        logger.log(
+            `[DBRP] Component search: UserProfileActivity=${activityTargets.length}, UserProfileContent=${contentTargets.length}`,
+        );
+
+        if (targets.length === 0) {
+            logger.error("[DBRP] No profile component found");
             return;
         }
 
-        try {
-            this.unpatch = after(
-                "type",
-                UserProfileActivity,
-                (args, result) => {
-                    try {
-                        const props =
-                            args?.[0] as
-                                | UserProfileActivityProps
-                                | undefined;
+        for (const target of targets) {
+            try {
+                const unpatch = after(
+                    "type",
+                    target,
+                    (args, result) => {
+                        try {
+                            const props = args?.[0] as ProfileProps | undefined;
+                            const userId = props?.user?.id;
 
-                        const userId = props?.user?.id;
+                            if (!userId) {
+                                return result;
+                            }
 
-                        if (!userId) {
-                            return result;
-                        }
+                            const activities = getActivities(String(userId));
 
-                        const activities =
-                            getActivities(String(userId));
+                            logger.log(
+                                `[DBRP] User ${userId}: ${activities.length} activity(ies)`,
+                            );
 
-                        const presenceView =
-                            createPresenceView(activities);
+                            const presenceView = createPresenceView(activities);
 
-                        if (!presenceView) {
-                            return result;
-                        }
+                            if (!presenceView) {
+                                return result;
+                            }
 
-                        logger.log(
-                            `[DBRP] Injecting buttons for user ${userId}`,
-                        );
+                            logger.log(
+                                `[DBRP] Injecting buttons for user ${userId}`,
+                            );
 
-                        return h(
-                            ReactNative.View,
-                            {
-                                style: {
-                                    width: "100%",
+                            return h(
+                                ReactNative.View,
+                                {
+                                    style: {
+                                        width: "100%",
+                                    },
                                 },
-                            },
-                            result,
-                            presenceView,
-                        );
-                    } catch (error) {
-                        logger.error(
-                            `[DBRP] Render injection failed: ${String(error)}`,
-                        );
+                                result,
+                                presenceView,
+                            );
+                        } catch (error) {
+                            logger.error(
+                                `[DBRP] Injection failed: ${String(error)}`,
+                            );
+                            return result;
+                        }
+                    },
+                );
 
-                        return result;
-                    }
-                },
-            );
-
-            this.started = true;
-
-            logger.log(
-                "[DBRP] UserProfileActivity patched",
-            );
-        } catch (error) {
-            this.unpatch = null;
-
-            logger.error(
-                `[DBRP] Failed to patch component: ${String(error)}`,
-            );
+                this.unpatches.push(unpatch);
+            } catch (error) {
+                logger.error(
+                    `[DBRP] Failed to patch candidate: ${String(error)}`,
+                );
+            }
         }
+
+        this.started = this.unpatches.length > 0;
+
+        logger.log(`[DBRP] Installed ${this.unpatches.length} patch(es)`);
     }
 
     stop(): void {
-        try {
-            this.unpatch?.();
-        } catch (error) {
-            logger.error(
-                `[DBRP] Unpatch failed: ${String(error)}`,
-            );
+        for (const unpatch of this.unpatches.splice(0)) {
+            try {
+                unpatch();
+            } catch (error) {
+                logger.error(`[DBRP] Unpatch failed: ${String(error)}`);
+            }
         }
 
-        this.unpatch = null;
         this.started = false;
-
         logger.log("[DBRP] Plugin unloaded");
     }
 }
